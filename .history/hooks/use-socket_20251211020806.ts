@@ -93,17 +93,7 @@ function createInitialGameState(gameType: string, player1Id: string, player2Id: 
     case "secret-code":
       return {
         ...baseState,
-        secretCode: initSecretCode('colors'),
-      }
-    case "secret-code-numbers":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('numbers'),
-      }
-    case "secret-code-letters":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('letters'),
+        secretCode: initSecretCode(),
       }
     case "go-fish":
       return {
@@ -160,8 +150,6 @@ function applyMove(state: GameState, move: unknown, playerId: string, gameType: 
     case "gomoku":
       return applyGomokuMove(state, move as { x: number; y: number }, playerId)
     case "secret-code":
-    case "secret-code-numbers":
-    case "secret-code-letters":
       return applySecretCodeMove(state, move as { colors: string[] })
     case "go-fish":
       return applyGoFishMove(state, move as { rank: string }, playerId)
@@ -359,16 +347,11 @@ export function useSocket(userId: string | undefined) {
     }
 
     const handleAiSecretCode = () => {
-      if (!roomState?.gameState?.secretCode) return
-      
-      const type = roomState.gameState.secretCode.codeType || 'colors'
-      let pool = ["red", "blue", "green", "yellow", "purple", "orange"]
-      if (type === 'numbers') pool = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-      if (type === 'letters') pool = ["A", "B", "C", "D", "E", "F"]
-
+      // Simple AI guess: random colors
+      const colors = ["red", "blue", "green", "yellow", "purple", "orange"]
       const guess = []
       for(let i=0; i<4; i++) {
-        guess.push(pool[Math.floor(Math.random() * pool.length)])
+        guess.push(colors[Math.floor(Math.random() * colors.length)])
       }
       makeMove({ colors: guess }, "ai-player")
     }

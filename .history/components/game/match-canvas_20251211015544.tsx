@@ -9,7 +9,6 @@ import { GoFishBoard } from "./go-fish-board"
 import { BattleshipBoard } from "./battleship-board"
 import { WarBoard } from "./war-board"
 import { RummyBoard } from "./rummy-board"
-import { ChessBoard } from "./chess-board"
 import type { GameState } from "@/hooks/use-socket"
 
 interface MatchCanvasProps {
@@ -74,10 +73,9 @@ export function MatchCanvas({ gameType, gameState, playerId, onMove }: MatchCanv
           />
         )
       case "chess":
-        if (!gameState.chess) return <div className="text-muted-foreground">Loading Chess...</div>
         return (
           <ChessBoard
-            chessState={gameState.chess}
+            chessState={gameState.chess!}
             onMove={(from, to) => onMove({ from, to })}
             disabled={isGameOver}
             playerId={playerId}
@@ -97,12 +95,9 @@ export function MatchCanvas({ gameType, gameState, playerId, onMove }: MatchCanv
           />
         )
       case "secret-code":
-      case "secret-code-numbers":
-      case "secret-code-letters":
-        if (!gameState.secretCode) return <div className="text-muted-foreground">Loading Secret Code...</div>
         return (
           <SecretCodeBoard
-            secretCodeState={gameState.secretCode}
+            secretCodeState={gameState.secretCode!}
             onGuess={(colors) => onMove({ colors })}
             disabled={isGameOver}
           />

@@ -183,7 +183,6 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
                 {renderPeg(value, "md")}
               </button>
             ))}
-            </div>
           </div>
 
           <div className="flex gap-2">

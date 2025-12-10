@@ -33,12 +33,12 @@ const GAMES = [
     category: ["classic", "strategy", "board"],
   },
   {
-    id: "chess",
-    title: "Chess",
-    description: "Classic strategy game. Checkmate the opponent's king.",
+    id: "connect-3",
+    title: "Connect 3",
+    description: "Fast variant of Connect 4 on a smaller 5x4 board. Connect three to win.",
     playerCount: "2 players",
-    duration: "15-30 min",
-    image: "/chess-game-board-with-pieces-strategy-classic.jpg",
+    duration: "2-5 min",
+    image: "/connect-three-game-board-colorful-discs-green-purp.jpg",
     category: ["classic", "strategy", "board"],
   },
   {
@@ -155,8 +155,8 @@ export default function LobbyPage() {
     setCreateModalOpen(true)
   }
 
-  const handleCreateRoom = (gameType: string, mode: string, isAiGame: boolean, difficulty: 'easy' | 'medium' | 'hard') => {
-    const roomCode = createRoom(gameType, mode, isAiGame, difficulty)
+  const handleCreateRoom = (gameType: string, mode: string, isAiGame: boolean) => {
+    const roomCode = createRoom(gameType, mode, isAiGame)
     router.push(`/room/${roomCode}?game=${gameType}`)
   }
 

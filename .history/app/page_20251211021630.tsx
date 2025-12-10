@@ -60,6 +60,24 @@ const GAMES = [
     category: ["strategy", "classic"],
   },
   {
+    id: "secret-code-numbers",
+    title: "Secret Number",
+    description: "Guess the secret 4-digit number. Logic and deduction required.",
+    playerCount: "1-2 players",
+    duration: "5-10 min",
+    image: "/mastermind-code-breaking-game-with-colorful-pegs-a.jpg", // Reuse image for now
+    category: ["strategy", "numbers"],
+  },
+  {
+    id: "secret-code-letters",
+    title: "Secret Letters",
+    description: "Crack the alphabetic code (A-F). A classic mastermind variant.",
+    playerCount: "1-2 players",
+    duration: "5-10 min",
+    image: "/mastermind-code-breaking-game-with-colorful-pegs-a.jpg", // Reuse image for now
+    category: ["strategy", "letters"],
+  },
+  {
     id: "go-fish",
     title: "Go Fish",
     description: "Classic card match game. Collect sets of four by asking for ranks.",

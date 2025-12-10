@@ -82,11 +82,9 @@ export interface ChessState {
   gameOver: boolean
   winner: string | null
   lastMove?: { from: { x: number; y: number }; to: { x: number; y: number } }
-  castlingRights: { w: { k: boolean, q: boolean }, b: { k: boolean, q: boolean } }
-  difficulty: 'easy' | 'medium' | 'hard'
 }
 
-export function initChess(difficulty: 'easy' | 'medium' | 'hard' = 'medium'): ChessState {
+export function initChess(): ChessState {
   const board: ChessBoard = Array(8).fill(null).map(() => Array(8).fill(null))
   
   // Initialize pawns
@@ -109,15 +107,11 @@ export function initChess(difficulty: 'easy' | 'medium' | 'hard' = 'medium'): Ch
     isCheckmate: false,
     isDraw: false,
     gameOver: false,
-    winner: null,
-    castlingRights: { w: { k: true, q: true }, b: { k: true, q: true } },
-    difficulty
+    winner: null
   }
 }
 
-
-export function isValidChessMove(state: ChessState, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
-  const { board, turn, castlingRights } = state
+export function isValidChessMove(board: ChessBoard, from: { x: number; y: number }, to: { x: number; y: number }, turn: 'w' | 'b'): boolean {
   const piece = board[from.x][from.y]
   if (!piece || piece.color !== turn) return false
   
@@ -133,43 +127,39 @@ export function isValidChessMove(state: ChessState, from: { x: number; y: number
   const absDx = Math.abs(dx)
   const absDy = Math.abs(dy)
 
+  // Simplified movement logic (not full chess rules, but playable for wireframe)
   switch (piece.type) {
     case 'p': // Pawn
       const direction = piece.color === 'w' ? -1 : 1
       const startRow = piece.color === 'w' ? 6 : 1
+      
+      // Move forward 1
       if (dy === 0 && dx === direction && !target) return true
+      // Move forward 2 from start
       if (dy === 0 && dx === direction * 2 && from.x === startRow && !target && !board[from.x + direction][from.y]) return true
+      // Capture diagonal
       if (Math.abs(dy) === 1 && dx === direction && target) return true
       return false
+      
     case 'r': // Rook
       if (dx !== 0 && dy !== 0) return false
       return isPathClear(board, from, to)
+      
     case 'n': // Knight
       return (absDx === 2 && absDy === 1) || (absDx === 1 && absDy === 2)
+      
     case 'b': // Bishop
       if (absDx !== absDy) return false
       return isPathClear(board, from, to)
+      
     case 'q': // Queen
       if (dx !== 0 && dy !== 0 && absDx !== absDy) return false
       return isPathClear(board, from, to)
+      
     case 'k': // King
-      if (absDx <= 1 && absDy <= 1) return true
-      // Castling
-      if (dy === 0) return false // Must move horizontally
-      if (absDx === 2 && dx === 2) { // Kingside
-        if (!castlingRights[turn].k) return false
-        if (!isPathClear(board, from, { x: from.x, y: 7 })) return false
-        // Check if passing through check (simplified: just check destination and start for now)
-        // In real chess, need to check intermediate square too.
-        return true
-      }
-      if (absDx === 2 && dx === -2) { // Queenside
-        if (!castlingRights[turn].q) return false
-        if (!isPathClear(board, from, { x: from.x, y: 0 })) return false
-        return true
-      }
-      return false
+      return absDx <= 1 && absDy <= 1
   }
+  
   return false
 }
 
@@ -191,50 +181,11 @@ function isPathClear(board: ChessBoard, from: { x: number; y: number }, to: { x:
 export function applyChessMove(state: ChessState, move: { from: { x: number; y: number }, to: { x: number; y: number } }): ChessState {
   if (state.gameOver) return state
   
-  if (!isValidChessMove(state, move.from, move.to)) return state
+  if (!isValidChessMove(state.board, move.from, move.to, state.turn)) return state
 
   const newBoard = state.board.map(row => [...row])
-  const piece = newBoard[move.from.x][move.from.y]!
-  const dx = move.to.x - move.from.x
-  const dy = move.to.y - move.from.y // Wait, x is row, y is col. 
-  // In my board setup: board[row][col]. row 0 is black back rank. row 7 is white back rank.
-  // So x is row (0-7), y is col (0-7).
-  // Castling is horizontal move, so dx should be 0, dy should be +/- 2.
-  // Wait, in isValidChessMove I used dx for castling? 
-  // "if (absDx === 2 && dx === 2)" -> this means row change? No, castling is col change.
-  // My isValidChessMove logic above used dx for castling which is wrong if x is row.
-  // Let's fix isValidChessMove logic in this replacement too? No, I need to fix it in the previous chunk or here.
-  // Actually, let's assume x is row, y is col.
-  // Castling: King moves from (0,4) to (0,6) or (0,2). So x change is 0. y change is +/- 2.
-  // My previous chunk used dx for castling. I need to fix that.
-  
-  // Let's fix the logic here for applyMove first.
-  
-  // Handle Castling Move
-  if (piece.type === 'k' && Math.abs(move.to.y - move.from.y) === 2) {
-    // Kingside
-    if (move.to.y > move.from.y) {
-      newBoard[move.from.x][7] = null
-      newBoard[move.from.x][5] = { type: 'r', color: piece.color }
-    } else { // Queenside
-      newBoard[move.from.x][0] = null
-      newBoard[move.from.x][3] = { type: 'r', color: piece.color }
-    }
-  }
-
-  newBoard[move.to.x][move.to.y] = piece
+  newBoard[move.to.x][move.to.y] = newBoard[move.from.x][move.from.y]
   newBoard[move.from.x][move.from.y] = null
-
-  // Update Castling Rights
-  const newCastlingRights = { ...state.castlingRights }
-  if (piece.type === 'k') {
-    newCastlingRights[piece.color].k = false
-    newCastlingRights[piece.color].q = false
-  }
-  if (piece.type === 'r') {
-    if (move.from.y === 0) newCastlingRights[piece.color].q = false
-    if (move.from.y === 7) newCastlingRights[piece.color].k = false
-  }
 
   // Check for king capture (simplified win condition)
   const opponentColor = state.turn === 'w' ? 'b' : 'w'
@@ -249,7 +200,7 @@ export function applyChessMove(state: ChessState, move: { from: { x: number; y: 
   }
 
   const gameOver = !kingFound
-  const winner = gameOver ? (state.turn === 'w' ? 'player1' : 'player2') : null
+  const winner = gameOver ? (state.turn === 'w' ? 'player1' : 'player2') : null // Map to player IDs later
 
   return {
     ...state,
@@ -257,12 +208,12 @@ export function applyChessMove(state: ChessState, move: { from: { x: number; y: 
     turn: opponentColor,
     lastMove: move,
     gameOver,
-    winner,
-    castlingRights: newCastlingRights
+    winner
   }
 }
 
 export function aiChessTurn(state: ChessState): { from: { x: number; y: number }, to: { x: number; y: number } } | null {
+  // Find all valid moves for current turn
   const moves: { from: { x: number; y: number }, to: { x: number; y: number } }[] = []
   
   for(let i=0; i<8; i++) {
@@ -271,7 +222,7 @@ export function aiChessTurn(state: ChessState): { from: { x: number; y: number }
       if (piece && piece.color === state.turn) {
         for(let x=0; x<8; x++) {
           for(let y=0; y<8; y++) {
-            if (isValidChessMove(state, {x: i, y: j}, {x, y})) {
+            if (isValidChessMove(state.board, {x: i, y: j}, {x, y}, state.turn)) {
               moves.push({ from: {x: i, y: j}, to: {x, y} })
             }
           }
@@ -281,36 +232,14 @@ export function aiChessTurn(state: ChessState): { from: { x: number; y: number }
   }
 
   if (moves.length === 0) return null
-
-  // Difficulty Logic
-  if (state.difficulty === 'easy') {
-    return moves[Math.floor(Math.random() * moves.length)]
+  
+  // Prioritize captures
+  const captures = moves.filter(m => state.board[m.to.x][m.to.y] !== null)
+  if (captures.length > 0) {
+    return captures[Math.floor(Math.random() * captures.length)]
   }
-
-  // Medium/Hard: Prioritize captures and checks
-  const scoredMoves = moves.map(move => {
-    let score = 0
-    const target = state.board[move.to.x][move.to.y]
-    if (target) {
-      // Capture value
-      const values: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 }
-      score += values[target.type] * 10
-    }
-    
-    // Check if move puts opponent in check (simple lookahead)
-    // This is expensive, maybe skip for medium?
-    // Let's just do random capture for medium
-    
-    return { move, score }
-  })
-
-  scoredMoves.sort((a, b) => b.score - a.score)
   
-  // Filter top moves
-  const bestScore = scoredMoves[0].score
-  const bestMoves = scoredMoves.filter(m => m.score === bestScore)
-  
-  return bestMoves[Math.floor(Math.random() * bestMoves.length)].move
+  return moves[Math.floor(Math.random() * moves.length)]
 }
 
 // ==================== CONNECT N ====================
@@ -438,21 +367,14 @@ export interface SecretCodeState {
   isCodeMaker: boolean
   gameOver: boolean
   won: boolean
-  codeType: 'colors' | 'numbers' | 'letters'
 }
 
 export const SECRET_CODE_COLORS = ["red", "blue", "green", "yellow", "purple", "orange"]
-export const SECRET_CODE_NUMBERS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-export const SECRET_CODE_LETTERS = ["A", "B", "C", "D", "E", "F"]
 export const SECRET_CODE_LENGTH = 4
 export const SECRET_CODE_MAX_GUESSES = 10
 
-export function generateSecretCode(length = SECRET_CODE_LENGTH, type: 'colors' | 'numbers' | 'letters' = 'colors'): string[] {
-  let pool = SECRET_CODE_COLORS
-  if (type === 'numbers') pool = SECRET_CODE_NUMBERS
-  if (type === 'letters') pool = SECRET_CODE_LETTERS
-  
-  return Array.from({ length }, () => pool[Math.floor(Math.random() * pool.length)])
+export function generateSecretCode(length = SECRET_CODE_LENGTH): string[] {
+  return Array.from({ length }, () => SECRET_CODE_COLORS[Math.floor(Math.random() * SECRET_CODE_COLORS.length)])
 }
 
 export function evaluateGuess(guess: string[], secretCode: string[]): { correct: number; misplaced: number } {
@@ -482,15 +404,14 @@ export function evaluateGuess(guess: string[], secretCode: string[]): { correct:
   return { correct, misplaced }
 }
 
-export function initSecretCode(type: 'colors' | 'numbers' | 'letters' = 'colors'): SecretCodeState {
+export function initSecretCode(): SecretCodeState {
   return {
-    secretCode: generateSecretCode(SECRET_CODE_LENGTH, type),
+    secretCode: generateSecretCode(SECRET_CODE_LENGTH),
     guesses: [],
     maxGuesses: SECRET_CODE_MAX_GUESSES,
     isCodeMaker: false,
     gameOver: false,
     won: false,
-    codeType: type
   }
 }
 

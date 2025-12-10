@@ -164,7 +164,6 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
                 {value ? renderPeg(value, "lg") : <div className="w-12 h-12 bg-card" />}
               </button>
             ))}
-            </div>
           </div>
 
           {/* Color palette */}
@@ -183,7 +182,6 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
                 {renderPeg(value, "md")}
               </button>
             ))}
-            </div>
           </div>
 
           <div className="flex gap-2">

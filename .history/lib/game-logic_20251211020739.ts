@@ -438,21 +438,14 @@ export interface SecretCodeState {
   isCodeMaker: boolean
   gameOver: boolean
   won: boolean
-  codeType: 'colors' | 'numbers' | 'letters'
 }
 
 export const SECRET_CODE_COLORS = ["red", "blue", "green", "yellow", "purple", "orange"]
-export const SECRET_CODE_NUMBERS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-export const SECRET_CODE_LETTERS = ["A", "B", "C", "D", "E", "F"]
 export const SECRET_CODE_LENGTH = 4
 export const SECRET_CODE_MAX_GUESSES = 10
 
-export function generateSecretCode(length = SECRET_CODE_LENGTH, type: 'colors' | 'numbers' | 'letters' = 'colors'): string[] {
-  let pool = SECRET_CODE_COLORS
-  if (type === 'numbers') pool = SECRET_CODE_NUMBERS
-  if (type === 'letters') pool = SECRET_CODE_LETTERS
-  
-  return Array.from({ length }, () => pool[Math.floor(Math.random() * pool.length)])
+export function generateSecretCode(length = SECRET_CODE_LENGTH): string[] {
+  return Array.from({ length }, () => SECRET_CODE_COLORS[Math.floor(Math.random() * SECRET_CODE_COLORS.length)])
 }
 
 export function evaluateGuess(guess: string[], secretCode: string[]): { correct: number; misplaced: number } {
@@ -482,15 +475,14 @@ export function evaluateGuess(guess: string[], secretCode: string[]): { correct:
   return { correct, misplaced }
 }
 
-export function initSecretCode(type: 'colors' | 'numbers' | 'letters' = 'colors'): SecretCodeState {
+export function initSecretCode(): SecretCodeState {
   return {
-    secretCode: generateSecretCode(SECRET_CODE_LENGTH, type),
+    secretCode: generateSecretCode(SECRET_CODE_LENGTH),
     guesses: [],
     maxGuesses: SECRET_CODE_MAX_GUESSES,
     isCodeMaker: false,
     gameOver: false,
     won: false,
-    codeType: type
   }
 }
 

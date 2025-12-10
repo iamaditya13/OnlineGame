@@ -35,12 +35,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return (
-    <html lang="en" className="dark">
-      <body className={`font-sans antialiased`}>
-        {children}
-        <Analytics />
-      </body>
-    </html>
+  return      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+          <span className="text-primary-foreground font-bold text-sm">OG</span>
+        </div>
+        <span className="font-semibold text-lg text-foreground hidden sm:block">OnlineGame</span>
+      </div>
   )
 }

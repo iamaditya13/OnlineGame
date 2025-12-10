@@ -86,7 +86,7 @@ export interface ChessState {
   difficulty: 'easy' | 'medium' | 'hard'
 }
 
-export function initChess(difficulty: 'easy' | 'medium' | 'hard' = 'medium'): ChessState {
+export function initChess(): ChessState {
   const board: ChessBoard = Array(8).fill(null).map(() => Array(8).fill(null))
   
   // Initialize pawns
@@ -111,10 +111,31 @@ export function initChess(difficulty: 'easy' | 'medium' | 'hard' = 'medium'): Ch
     gameOver: false,
     winner: null,
     castlingRights: { w: { k: true, q: true }, b: { k: true, q: true } },
-    difficulty
+    difficulty: 'medium'
   }
 }
 
+    case 'k': // King
+      // Normal move
+      if (absDx <= 1 && absDy <= 1) return true
+      
+      // Castling
+      // Must be first move (checked by castlingRights in applyMove, but here we check path and rights)
+      // Actually, we need state to check rights. isValidChessMove signature only has board.
+      // We need to update signature or pass rights. 
+      // For now, let's assume we can't check rights here without state.
+      // But wait, applyChessMove calls this. 
+      // Let's update isValidChessMove signature to take state or rights?
+      // Or just check geometry here and rights in applyMove?
+      // Better to pass rights. But that breaks signature.
+      // Let's overload or just check geometry for now and let applyMove validate rights?
+      // No, UI needs to know valid moves.
+      // I will update the signature of isValidChessMove to take ChessState instead of just board/turn.
+      return false
+  }
+  
+  return false
+}
 
 export function isValidChessMove(state: ChessState, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
   const { board, turn, castlingRights } = state
@@ -438,21 +459,14 @@ export interface SecretCodeState {
   isCodeMaker: boolean
   gameOver: boolean
   won: boolean
-  codeType: 'colors' | 'numbers' | 'letters'
 }
 
 export const SECRET_CODE_COLORS = ["red", "blue", "green", "yellow", "purple", "orange"]
-export const SECRET_CODE_NUMBERS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-export const SECRET_CODE_LETTERS = ["A", "B", "C", "D", "E", "F"]
 export const SECRET_CODE_LENGTH = 4
 export const SECRET_CODE_MAX_GUESSES = 10
 
-export function generateSecretCode(length = SECRET_CODE_LENGTH, type: 'colors' | 'numbers' | 'letters' = 'colors'): string[] {
-  let pool = SECRET_CODE_COLORS
-  if (type === 'numbers') pool = SECRET_CODE_NUMBERS
-  if (type === 'letters') pool = SECRET_CODE_LETTERS
-  
-  return Array.from({ length }, () => pool[Math.floor(Math.random() * pool.length)])
+export function generateSecretCode(length = SECRET_CODE_LENGTH): string[] {
+  return Array.from({ length }, () => SECRET_CODE_COLORS[Math.floor(Math.random() * SECRET_CODE_COLORS.length)])
 }
 
 export function evaluateGuess(guess: string[], secretCode: string[]): { correct: number; misplaced: number } {
@@ -482,15 +496,14 @@ export function evaluateGuess(guess: string[], secretCode: string[]): { correct:
   return { correct, misplaced }
 }
 
-export function initSecretCode(type: 'colors' | 'numbers' | 'letters' = 'colors'): SecretCodeState {
+export function initSecretCode(): SecretCodeState {
   return {
-    secretCode: generateSecretCode(SECRET_CODE_LENGTH, type),
+    secretCode: generateSecretCode(SECRET_CODE_LENGTH),
     guesses: [],
     maxGuesses: SECRET_CODE_MAX_GUESSES,
     isCodeMaker: false,
     gameOver: false,
     won: false,
-    codeType: type
   }
 }
 

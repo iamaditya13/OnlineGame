@@ -21,15 +21,11 @@ import {
   drawCard,
   discardCard,
   declareRummy,
-  initChess,
-  applyChessMove,
-  aiChessTurn,
   type SecretCodeState,
   type GoFishState,
   type BattleshipState,
   type WarState,
   type RummyState,
-  type ChessState,
 } from "@/lib/game-logic"
 
 export interface GameState {
@@ -46,17 +42,165 @@ export interface GameState {
   battleship?: BattleshipState
   war?: WarState
   rummy?: RummyState
-  chess?: ChessState
 }
 
+export interface RoomState {
+  code: string
+  gameType: string
+  mode: string
+  players: { id: string; username: string; isReady: boolean }[]
+  gameState: GameState | null
+  status: "waiting" | "playing" | "finished"
+  chat: { userId: string; username: string; message: string; timestamp: number }[]
+}
 
-function createInitialGameState(gameType: string, player1Id: string, player2Id: string = "player2", difficulty: 'easy' | 'medium' | 'hard' = 'medium'): GameState {
+export function useSocket(userId: string | undefined) {
+  const [isConnected, setIsConnected] = useState(false)
+  const [roomState, setRoomState] = useState<RoomState | null>(null)
+
+  useEffect(() => {
+    if (!userId) return
+    const timer = setTimeout(() => setIsConnected(true), 500)
+    return () => clearTimeout(timer)
+  }, [userId])
+
+  const createRoom = useCallback(
+    (gameType: string, mode: string) => {
+      const code = generateRoomCode()
+      const newRoom: RoomState = {
+        code,
+        gameType,
+        mode,
+        players: userId ? [{ id: userId, username: "You", isReady: true }] : [],
+        gameState: null,
+        status: "waiting",
+        chat: [],
+      }
+      setRoomState(newRoom)
+      return code
+    },
+    [userId],
+  )
+
+  const joinRoom = useCallback(
+    (code: string) => {
+      const gameType = new URLSearchParams(window.location.search).get("game") || "tic-tac-toe"
+
+      setRoomState({
+        code,
+        gameType,
+        mode: "casual",
+        players: [
+          { id: "player1", username: "Player 1", isReady: true },
+          { id: userId || "player2", username: "You", isReady: true },
+        ],
+        gameState: createInitialGameState(gameType, userId || "player2"),
+        status: "playing",
+        chat: [],
+      })
+    },
+    [userId],
+  )
+
+  const makeMove = useCallback(
+    (move: unknown) => {
+      if (!roomState?.gameState || !userId) return
+
+      setRoomState((prev) => {
+        if (!prev?.gameState) return prev
+        const newState = applyMove(prev.gameState, move, userId, prev.gameType)
+        return { ...prev, gameState: newState }
+      })
+    },
+    [roomState, userId],
+  )
+
+  const sendChat = useCallback(
+    (message: string) => {
+      setRoomState((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          chat: [
+            ...prev.chat,
+            {
+              userId: userId || "",
+              username: "You",
+              message,
+              timestamp: Date.now(),
+            },
+          ],
+        }
+      })
+    },
+    [userId],
+  )
+
+  const leaveRoom = useCallback(() => {
+    setRoomState(null)
+  }, [])
+
+  const { recordMatch } = useLocalUser()
+
+  useEffect(() => {
+    if (roomState?.gameState?.winner && !roomState.gameState.isDraw) {
+      const isWinner = roomState.gameState.winner === userId
+      const result = isWinner ? "win" : "loss"
+      recordMatch(roomState.gameType, result)
+    } else if (roomState?.gameState?.isDraw) {
+      recordMatch(roomState.gameType, "draw")
+    }
+  }, [roomState?.gameState?.winner, roomState?.gameState?.isDraw])
+
+  useEffect(() => {
+    const handleAiMove = (e: Event) => {
+      const customEvent = e as CustomEvent
+      makeMove(customEvent.detail)
+    }
+
+    const handleAiBattleship = () => {
+      // Logic for AI battleship turn would go here
+      // For now we just skip turn back to player or make random move
+      // This requires more complex state manipulation than simple makeMove
+    }
+
+    window.addEventListener("ai-move", handleAiMove)
+    window.addEventListener("ai-battleship-turn", handleAiBattleship)
+    
+    return () => {
+      window.removeEventListener("ai-move", handleAiMove)
+      window.removeEventListener("ai-battleship-turn", handleAiBattleship)
+    }
+  }, [makeMove])
+
+  return {
+    isConnected,
+    roomState,
+    createRoom,
+    joinRoom,
+    makeMove,
+    sendChat,
+    leaveRoom,
+    setRoomState,
+  }
+}
+
+function generateRoomCode(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  let code = ""
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return code
+}
+
+function createInitialGameState(gameType: string, playerId: string): GameState {
   const baseState: GameState = {
     board: [],
-    currentPlayer: player1Id,
+    currentPlayer: "player1",
     players: [
-      { id: player1Id, username: "Player 1", symbol: "X" },
-      { id: player2Id, username: player2Id === "ai-player" ? "AI Opponent" : "Player 2", symbol: "O" },
+      { id: "player1", username: "Player 1", symbol: "X" },
+      { id: playerId, username: "You", symbol: "O" },
     ],
     winner: null,
     isDraw: false,
@@ -78,10 +222,12 @@ function createInitialGameState(gameType: string, player1Id: string, player2Id: 
           .fill(null)
           .map(() => Array(7).fill(null)),
       }
-    case "chess":
+    case "connect-3":
       return {
         ...baseState,
-        chess: initChess(difficulty),
+        board: Array(4)
+          .fill(null)
+          .map(() => Array(5).fill(null)),
       }
     case "gomoku":
       return {
@@ -93,17 +239,7 @@ function createInitialGameState(gameType: string, player1Id: string, player2Id: 
     case "secret-code":
       return {
         ...baseState,
-        secretCode: initSecretCode('colors'),
-      }
-    case "secret-code-numbers":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('numbers'),
-      }
-    case "secret-code-letters":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('letters'),
+        secretCode: initSecretCode(),
       }
     case "go-fish":
       return {
@@ -141,27 +277,11 @@ function applyMove(state: GameState, move: unknown, playerId: string, gameType: 
       return applyTicTacToeMove(state, move as { x: number; y: number }, playerId)
     case "connect-4":
       return applyConnectMove(state, move as { x: number; y: number }, playerId, 4)
-    case "chess":
-      const chessState = applyChessMove(state.chess!, move as { from: { x: number; y: number }, to: { x: number; y: number } })
-      const winner = chessState.winner === "player1" ? state.players[0].id : chessState.winner === "player2" ? state.players[1].id : null
-      
-      // AI Turn
-      if (chessState.turn === 'b' && !chessState.gameOver) {
-         setTimeout(() => {
-            window.dispatchEvent(new CustomEvent("ai-chess-turn"))
-         }, 1000)
-      }
-
-      return {
-        ...state,
-        chess: chessState,
-        winner
-      }
+    case "connect-3":
+      return applyConnectMove(state, move as { x: number; y: number }, playerId, 3)
     case "gomoku":
       return applyGomokuMove(state, move as { x: number; y: number }, playerId)
     case "secret-code":
-    case "secret-code-numbers":
-    case "secret-code-letters":
       return applySecretCodeMove(state, move as { colors: string[] })
     case "go-fish":
       return applyGoFishMove(state, move as { rank: string }, playerId)
@@ -180,260 +300,6 @@ function applyMove(state: GameState, move: unknown, playerId: string, gameType: 
   }
 }
 
-export interface RoomState {
-  code: string
-  hostId: string
-  gameType: string
-  status: "waiting" | "playing" | "finished"
-  players: { id: string; username: string; isReady: boolean; isHost?: boolean }[]
-  chat: { userId: string; username: string; message: string; timestamp: number }[]
-  settings: {
-    mode: string
-    isPublic: boolean
-  }
-  isAiGame?: boolean
-  gameState?: GameState | null
-}
-
-export function useSocket(userId: string | undefined) {
-  const [isConnected, setIsConnected] = useState(false)
-  const [roomState, setRoomState] = useState<RoomState | null>(null)
-
-  // Load room state from local storage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("timekill_room")
-    if (stored) {
-      try {
-        setRoomState(JSON.parse(stored))
-      } catch (e) {
-        console.error("Failed to parse stored room state", e)
-      }
-    }
-  }, [])
-
-  // Save room state to local storage whenever it changes
-  useEffect(() => {
-    if (roomState) {
-      localStorage.setItem("timekill_room", JSON.stringify(roomState))
-    } else {
-      // Only remove if explicitly set to null (leaving room), not initial load
-      // But we can't distinguish initial null from explicit null here easily without another ref
-      // For now, let's rely on leaveRoom to clear it
-    }
-  }, [roomState])
-
-  useEffect(() => {
-    if (!userId) return
-    const timer = setTimeout(() => setIsConnected(true), 500)
-    return () => clearTimeout(timer)
-  }, [userId])
-
-  const createRoom = useCallback(
-    (gameType: string, mode: string, isAiGame: boolean = false, difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
-      const code = generateRoomCode()
-      const newRoomState: RoomState = {
-        code,
-        hostId: userId || "host",
-        players: [
-          {
-            id: userId || "host",
-            username: "You",
-            isHost: true,
-            isReady: true,
-          },
-        ],
-        gameType,
-        status: "waiting",
-        settings: {
-          mode,
-          isPublic: true,
-        },
-        isAiGame,
-        chat: [],
-        gameState: null,
-      }
-
-      // If AI game, add AI player immediately and start game
-      if (isAiGame) {
-        newRoomState.players.push({
-          id: "ai-player",
-          username: "AI Opponent",
-          isHost: false,
-          isReady: true,
-        })
-        newRoomState.status = "playing"
-        newRoomState.gameState = createInitialGameState(gameType, userId || "host", "ai-player", difficulty)
-      }
-
-      setRoomState(newRoomState)
-      localStorage.setItem("timekill_room", JSON.stringify(newRoomState))
-      return code
-    },
-    [userId],
-  )
-
-  const joinRoom = useCallback(
-    (code: string) => {
-      // In a real app, this would fetch room data from server
-      // For now, we only support joining if we're already in the room (local state)
-      if (roomState?.code === code) {
-        return true
-      }
-      return false
-    },
-    [roomState],
-  )
-
-  const makeMove = useCallback(
-    (move: unknown, asPlayerId?: string) => {
-      if (!roomState?.gameState || !userId) return
-
-      const playerId = asPlayerId || userId
-      const newGameState = applyMove(roomState.gameState, move, playerId, roomState.gameType)
-      
-      setRoomState((prev) => {
-        if (!prev) return null
-        return {
-          ...prev,
-          gameState: newGameState,
-        }
-      })
-    },
-    [roomState, userId],
-  )
-
-  const sendChat = useCallback((message: string) => {
-    // Implementation for chat would go here
-    console.log("Sending chat:", message)
-  }, [])
-
-  const leaveRoom = useCallback(() => {
-    setRoomState(null)
-    localStorage.removeItem("timekill_room")
-  }, [])
-
-  const { recordMatch } = useLocalUser()
-
-  useEffect(() => {
-    if (roomState?.gameState?.winner && !roomState.gameState.isDraw) {
-      const isWinner = roomState.gameState.winner === userId
-      const result = isWinner ? "win" : "loss"
-      recordMatch(roomState.gameType, result)
-    } else if (roomState?.gameState?.isDraw) {
-      recordMatch(roomState.gameType, "draw")
-    }
-  }, [roomState?.gameState?.winner, roomState?.gameState?.isDraw])
-
-  useEffect(() => {
-    const handleAiMove = (e: Event) => {
-      const customEvent = e as CustomEvent
-      makeMove(customEvent.detail, "ai-player")
-    }
-
-    const handleAiBattleship = () => {
-      if (!roomState?.gameState?.battleship) return
-      // Simple random AI for battleship
-      const size = 10
-      let x, y
-      // Try 20 times to find a valid move
-      for(let i=0; i<20; i++) {
-        x = Math.floor(Math.random() * size)
-        y = Math.floor(Math.random() * size)
-        // Check if already attacked (simplified check)
-        const cell = roomState.gameState.battleship.playerBoard[x][y]
-        if (cell === null || cell === "ship") break
-      }
-      if (x !== undefined && y !== undefined) {
-        makeMove({ x, y }, "ai-player")
-      }
-    }
-
-    const handleAiRummy = () => {
-       // Simple AI for Rummy: Draw then Discard
-       makeMove({ action: "draw", from: "deck" }, "ai-player")
-       setTimeout(() => {
-         // Discard a random card (simplified)
-         // In a real app we would check hand and discard logic
-         // For now we just skip the discard to avoid errors
-       }, 500)
-    }
-
-    const handleAiSecretCode = () => {
-      if (!roomState?.gameState?.secretCode) return
-      
-      const type = roomState.gameState.secretCode.codeType || 'colors'
-      let pool = ["red", "blue", "green", "yellow", "purple", "orange"]
-      if (type === 'numbers') pool = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-      if (type === 'letters') pool = ["A", "B", "C", "D", "E", "F"]
-
-      const guess = []
-      for(let i=0; i<4; i++) {
-        guess.push(pool[Math.floor(Math.random() * pool.length)])
-      }
-      makeMove({ colors: guess }, "ai-player")
-    }
-
-    const handleAiGoFish = () => {
-      // Simple AI: ask for random rank
-      const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
-      const rank = ranks[Math.floor(Math.random() * ranks.length)]
-      makeMove({ rank }, "ai-player")
-    }
-
-    const handleAiWar = () => {
-      // War is auto-play usually, but if manual:
-      makeMove({ action: "play" }, "ai-player")
-    }
-
-    const handleAiChess = () => {
-      if (!roomState?.gameState?.chess) return
-      const move = aiChessTurn(roomState.gameState.chess)
-      if (move) {
-        makeMove(move, "ai-player")
-      }
-    }
-
-    window.addEventListener("ai-move", handleAiMove)
-    window.addEventListener("ai-battleship-turn", handleAiBattleship)
-    window.addEventListener("ai-rummy-turn", handleAiRummy)
-    window.addEventListener("ai-secret-code-turn", handleAiSecretCode)
-    window.addEventListener("ai-go-fish-turn", handleAiGoFish)
-    window.addEventListener("ai-war-turn", handleAiWar)
-    window.addEventListener("ai-chess-turn", handleAiChess)
-    
-    return () => {
-      window.removeEventListener("ai-move", handleAiMove)
-      window.removeEventListener("ai-battleship-turn", handleAiBattleship)
-      window.removeEventListener("ai-rummy-turn", handleAiRummy)
-      window.removeEventListener("ai-secret-code-turn", handleAiSecretCode)
-      window.removeEventListener("ai-go-fish-turn", handleAiGoFish)
-      window.removeEventListener("ai-war-turn", handleAiWar)
-      window.removeEventListener("ai-chess-turn", handleAiChess)
-    }
-  }, [makeMove, roomState])
-
-  return {
-    isConnected,
-    roomState,
-    createRoom,
-    joinRoom,
-    makeMove,
-    sendChat,
-    leaveRoom,
-    setRoomState,
-  }
-}
-
-function generateRoomCode(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let code = ""
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return code
-}
-
-
 // ==================== TIC-TAC-TOE MOVE ====================
 function applyTicTacToeMove(state: GameState, move: { x: number; y: number }, playerId: string): GameState {
   const { x, y } = move
@@ -451,7 +317,7 @@ function applyTicTacToeMove(state: GameState, move: { x: number; y: number }, pl
   const winnerPlayer = result.winner ? state.players.find((p) => p.symbol === result.winner)?.id || null : null
   const nextPlayer = state.players.find((p) => p.id !== state.currentPlayer)?.id || state.currentPlayer
 
-  if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
+  if (!result.winner && !result.isDraw && nextPlayer === "player1") {
     setTimeout(() => {
       const aiMove = getAiTicTacToeMove(newBoard)
       if (aiMove) {
@@ -526,7 +392,7 @@ function applyConnectMove(state: GameState, move: { x: number; y: number }, play
   const winnerPlayer = result.winner ? state.players.find((p) => p.symbol === result.winner)?.id || null : null
   const nextPlayer = state.players.find((p) => p.id !== state.currentPlayer)?.id || state.currentPlayer
 
-  if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
+  if (!result.winner && !result.isDraw && nextPlayer === "player1") {
     setTimeout(() => {
       const aiColumn = getAiConnectMove(newBoard, n)
       if (aiColumn !== null) {
@@ -591,7 +457,7 @@ function applyGomokuMove(state: GameState, move: { x: number; y: number }, playe
   const winnerPlayer = result.winner ? state.players.find((p) => p.symbol === result.winner)?.id || null : null
   const nextPlayer = state.players.find((p) => p.id !== state.currentPlayer)?.id || state.currentPlayer
 
-  if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
+  if (!result.winner && !result.isDraw && nextPlayer === "player1") {
     setTimeout(() => {
       const aiMove = getAiGomokuMove(newBoard, { x, y })
       if (aiMove) {

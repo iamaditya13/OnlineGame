@@ -20,13 +20,11 @@ import {
   initRummy,
   aiRummyTurn,
 } from "@/lib/game-logic"
-import { TutorialOverlay } from "@/components/ui/tutorial-overlay"
-import { GameTutorial } from "@/components/game/game-tutorial"
 
 const GAME_NAMES: Record<string, string> = {
   "tic-tac-toe": "Tic-Tac-Toe",
   "connect-4": "Connect 4",
-  chess: "Chess",
+  "connect-3": "Connect 3",
   gomoku: "Gomoku",
   "secret-code": "Secret Code",
   "go-fish": "Go Fish",
@@ -45,7 +43,6 @@ export default function RoomPage() {
 
   const [copied, setCopied] = useState(false)
   const [turnTimer, setTurnTimer] = useState(0)
-  const [showTutorial, setShowTutorial] = useState(true)
 
   const gameTypeFromUrl = searchParams.get("game") || "tic-tac-toe"
 
@@ -116,7 +113,7 @@ export default function RoomPage() {
               battleship: newBattleshipState,
               winner:
                 newBattleshipState.winner === "player"
-                  ? user?._id || null
+                  ? user?._id
                   : newBattleshipState.winner === "opponent"
                     ? "player1"
                     : null,
@@ -143,7 +140,7 @@ export default function RoomPage() {
               ...prev.gameState,
               rummy: newRummyState,
               winner:
-                newRummyState.winner === "player" ? user?._id || null : newRummyState.winner === "opponent" ? "player1" : null,
+                newRummyState.winner === "player" ? user?._id : newRummyState.winner === "opponent" ? "player1" : null,
               isDraw: newRummyState.phase === "finished" && newRummyState.winner === null,
             },
           }
@@ -283,11 +280,6 @@ export default function RoomPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <GameTutorial 
-        gameType={roomState?.gameType || ""} 
-        open={showTutorial && !!roomState} 
-        onClose={() => setShowTutorial(false)} 
-      />
       {/* Header */}
       <header className="h-16 border-b border-border bg-card px-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -306,15 +298,17 @@ export default function RoomPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button
-            onClick={handleRestart}
-            variant="outline"
-            size="sm"
-            className="border-border text-foreground bg-transparent"
-          >
-            <RotateCcw className="h-4 w-4 mr-1" />
-            {isGameOver ? "Play Again" : "Restart"}
-          </Button>
+          {isGameOver && (
+            <Button
+              onClick={handleRestart}
+              variant="outline"
+              size="sm"
+              className="border-border text-foreground bg-transparent"
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Play Again
+            </Button>
+          )}
 
           <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary">
             <Clock className="h-4 w-4 text-muted-foreground" />

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Smile, Plus, Trash2 } from "lucide-react"
+import { Send, Smile } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -26,8 +26,6 @@ interface ChatPanelProps {
 export function ChatPanel({ messages, onSendMessage, currentUserId }: ChatPanelProps) {
   const [input, setInput] = useState("")
   const [isOpen, setIsOpen] = useState(false)
-  const [customTaunts, setCustomTaunts] = useState<string[]>([])
-  const [newTaunt, setNewTaunt] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const EMOJIS = ["😀", "😂", "😎", "😭", "😡", "👍", "👎", "🔥", "💀", "👻", "❤️", "🎉", "🤔", "👀", "🤝", "👋"]
@@ -42,22 +40,6 @@ export function ChatPanel({ messages, onSendMessage, currentUserId }: ChatPanelP
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
-
-  useEffect(() => {
-    const saved = localStorage.getItem("custom-taunts")
-    if (saved) {
-      try {
-        setCustomTaunts(JSON.parse(saved))
-      } catch (e) {
-        console.error("Failed to parse custom taunts", e)
-      }
-    }
-  }, [])
-
-  const saveCustomTaunts = (taunts: string[]) => {
-    setCustomTaunts(taunts)
-    localStorage.setItem("custom-taunts", JSON.stringify(taunts))
-  }
 
   const handleSend = () => {
     if (input.trim()) {
@@ -80,20 +62,6 @@ export function ChatPanel({ messages, onSendMessage, currentUserId }: ChatPanelP
   const handleTauntClick = (taunt: string) => {
     onSendMessage(taunt)
     setIsOpen(false)
-  }
-
-  const handleAddTaunt = () => {
-    if (newTaunt.trim()) {
-      const updated = [...customTaunts, newTaunt.trim()]
-      saveCustomTaunts(updated)
-      setNewTaunt("")
-    }
-  }
-
-  const handleDeleteTaunt = (index: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    const updated = customTaunts.filter((_, i) => i !== index)
-    saveCustomTaunts(updated)
   }
 
   return (
@@ -153,52 +121,16 @@ export function ChatPanel({ messages, onSendMessage, currentUserId }: ChatPanelP
                   </div>
                 </TabsContent>
                 <TabsContent value="taunts" className="p-2">
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input 
-                        value={newTaunt} 
-                        onChange={(e) => setNewTaunt(e.target.value)}
-                        placeholder="New taunt..."
-                        className="h-8 text-xs bg-input border-border text-foreground"
-                      />
-                      <Button 
-                        size="icon" 
-                        variant="secondary" 
-                        className="h-8 w-8 shrink-0 bg-secondary text-secondary-foreground"
-                        onClick={handleAddTaunt}
-                        disabled={!newTaunt.trim()}
+                  <div className="grid grid-cols-1 gap-1 max-h-48 overflow-y-auto">
+                    {TAUNTS.map((taunt) => (
+                      <button
+                        key={taunt}
+                        onClick={() => handleTauntClick(taunt)}
+                        className="text-sm text-left px-3 py-2 hover:bg-secondary rounded transition-colors text-foreground"
                       >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-1 max-h-48 overflow-y-auto">
-                      {customTaunts.map((taunt, i) => (
-                        <div key={`custom-${i}`} className="flex items-center group">
-                          <button
-                            onClick={() => handleTauntClick(taunt)}
-                            className="flex-1 text-sm text-left px-3 py-2 hover:bg-secondary rounded transition-colors text-foreground truncate"
-                          >
-                            {taunt}
-                          </button>
-                          <button 
-                            onClick={(e) => handleDeleteTaunt(i, e)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                      {customTaunts.length > 0 && <div className="h-px bg-border my-1" />}
-                      {TAUNTS.map((taunt) => (
-                        <button
-                          key={taunt}
-                          onClick={() => handleTauntClick(taunt)}
-                          className="text-sm text-left px-3 py-2 hover:bg-secondary rounded transition-colors text-foreground"
-                        >
-                          {taunt}
-                        </button>
-                      ))}
-                    </div>
+                        {taunt}
+                      </button>
+                    ))}
                   </div>
                 </TabsContent>
               </Tabs>

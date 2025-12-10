@@ -9,7 +9,6 @@ import { GoFishBoard } from "./go-fish-board"
 import { BattleshipBoard } from "./battleship-board"
 import { WarBoard } from "./war-board"
 import { RummyBoard } from "./rummy-board"
-import { ChessBoard } from "./chess-board"
 import type { GameState } from "@/hooks/use-socket"
 
 interface MatchCanvasProps {
@@ -73,15 +72,17 @@ export function MatchCanvas({ gameType, gameState, playerId, onMove }: MatchCanv
             lastMove={gameState.lastMove}
           />
         )
-      case "chess":
-        if (!gameState.chess) return <div className="text-muted-foreground">Loading Chess...</div>
+      case "connect-3":
         return (
-          <ChessBoard
-            chessState={gameState.chess}
-            onMove={(from, to) => onMove({ from, to })}
+          <ConnectBoard
+            board={gameState.board}
+            onColumnClick={handleColumnClick}
             disabled={isGameOver}
-            playerId={playerId}
             currentPlayer={gameState.currentPlayer}
+            playerId={playerId}
+            connectN={3}
+            winningCells={gameState.winningCells}
+            lastMove={gameState.lastMove}
           />
         )
       case "gomoku":
@@ -97,12 +98,9 @@ export function MatchCanvas({ gameType, gameState, playerId, onMove }: MatchCanv
           />
         )
       case "secret-code":
-      case "secret-code-numbers":
-      case "secret-code-letters":
-        if (!gameState.secretCode) return <div className="text-muted-foreground">Loading Secret Code...</div>
         return (
           <SecretCodeBoard
-            secretCodeState={gameState.secretCode}
+            secretCodeState={gameState.secretCode!}
             onGuess={(colors) => onMove({ colors })}
             disabled={isGameOver}
           />

@@ -21,15 +21,11 @@ import {
   drawCard,
   discardCard,
   declareRummy,
-  initChess,
-  applyChessMove,
-  aiChessTurn,
   type SecretCodeState,
   type GoFishState,
   type BattleshipState,
   type WarState,
   type RummyState,
-  type ChessState,
 } from "@/lib/game-logic"
 
 export interface GameState {
@@ -46,138 +42,6 @@ export interface GameState {
   battleship?: BattleshipState
   war?: WarState
   rummy?: RummyState
-  chess?: ChessState
-}
-
-
-function createInitialGameState(gameType: string, player1Id: string, player2Id: string = "player2", difficulty: 'easy' | 'medium' | 'hard' = 'medium'): GameState {
-  const baseState: GameState = {
-    board: [],
-    currentPlayer: player1Id,
-    players: [
-      { id: player1Id, username: "Player 1", symbol: "X" },
-      { id: player2Id, username: player2Id === "ai-player" ? "AI Opponent" : "Player 2", symbol: "O" },
-    ],
-    winner: null,
-    isDraw: false,
-    moveHistory: [],
-  }
-
-  switch (gameType) {
-    case "tic-tac-toe":
-      return {
-        ...baseState,
-        board: Array(3)
-          .fill(null)
-          .map(() => Array(3).fill(null)),
-      }
-    case "connect-4":
-      return {
-        ...baseState,
-        board: Array(6)
-          .fill(null)
-          .map(() => Array(7).fill(null)),
-      }
-    case "chess":
-      return {
-        ...baseState,
-        chess: initChess(difficulty),
-      }
-    case "gomoku":
-      return {
-        ...baseState,
-        board: Array(15)
-          .fill(null)
-          .map(() => Array(15).fill(null)),
-      }
-    case "secret-code":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('colors'),
-      }
-    case "secret-code-numbers":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('numbers'),
-      }
-    case "secret-code-letters":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('letters'),
-      }
-    case "go-fish":
-      return {
-        ...baseState,
-        goFish: initGoFish(),
-      }
-    case "battleship":
-      return {
-        ...baseState,
-        battleship: initBattleship(),
-      }
-    case "war":
-      return {
-        ...baseState,
-        war: initWar(),
-      }
-    case "rummy":
-      return {
-        ...baseState,
-        rummy: initRummy(),
-      }
-    default:
-      return {
-        ...baseState,
-        board: Array(3)
-          .fill(null)
-          .map(() => Array(3).fill(null)),
-      }
-  }
-}
-
-function applyMove(state: GameState, move: unknown, playerId: string, gameType: string): GameState {
-  switch (gameType) {
-    case "tic-tac-toe":
-      return applyTicTacToeMove(state, move as { x: number; y: number }, playerId)
-    case "connect-4":
-      return applyConnectMove(state, move as { x: number; y: number }, playerId, 4)
-    case "chess":
-      const chessState = applyChessMove(state.chess!, move as { from: { x: number; y: number }, to: { x: number; y: number } })
-      const winner = chessState.winner === "player1" ? state.players[0].id : chessState.winner === "player2" ? state.players[1].id : null
-      
-      // AI Turn
-      if (chessState.turn === 'b' && !chessState.gameOver) {
-         setTimeout(() => {
-            window.dispatchEvent(new CustomEvent("ai-chess-turn"))
-         }, 1000)
-      }
-
-      return {
-        ...state,
-        chess: chessState,
-        winner
-      }
-    case "gomoku":
-      return applyGomokuMove(state, move as { x: number; y: number }, playerId)
-    case "secret-code":
-    case "secret-code-numbers":
-    case "secret-code-letters":
-      return applySecretCodeMove(state, move as { colors: string[] })
-    case "go-fish":
-      return applyGoFishMove(state, move as { rank: string }, playerId)
-    case "battleship":
-      return applyBattleshipMove(
-        state,
-        move as { x: number; y: number; horizontal?: boolean; rotate?: boolean },
-        playerId,
-      )
-    case "war":
-      return applyWarMove(state, move as { action: string })
-    case "rummy":
-      return applyRummyMove(state, move as { action: string; from?: string; cardId?: string }, playerId)
-    default:
-      return state
-  }
 }
 
 export interface RoomState {
@@ -229,7 +93,7 @@ export function useSocket(userId: string | undefined) {
   }, [userId])
 
   const createRoom = useCallback(
-    (gameType: string, mode: string, isAiGame: boolean = false, difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
+    (gameType: string, mode: string, isAiGame: boolean = false) => {
       const code = generateRoomCode()
       const newRoomState: RoomState = {
         code,
@@ -262,7 +126,7 @@ export function useSocket(userId: string | undefined) {
           isReady: true,
         })
         newRoomState.status = "playing"
-        newRoomState.gameState = createInitialGameState(gameType, userId || "host", "ai-player", difficulty)
+        newRoomState.gameState = createInitialGameState(gameType, userId || "host", "ai-player")
       }
 
       setRoomState(newRoomState)
@@ -285,11 +149,10 @@ export function useSocket(userId: string | undefined) {
   )
 
   const makeMove = useCallback(
-    (move: unknown, asPlayerId?: string) => {
+    (move: unknown) => {
       if (!roomState?.gameState || !userId) return
 
-      const playerId = asPlayerId || userId
-      const newGameState = applyMove(roomState.gameState, move, playerId, roomState.gameType)
+      const newGameState = applyMove(roomState.gameState, move, userId, roomState.gameType)
       
       setRoomState((prev) => {
         if (!prev) return null
@@ -327,7 +190,7 @@ export function useSocket(userId: string | undefined) {
   useEffect(() => {
     const handleAiMove = (e: Event) => {
       const customEvent = e as CustomEvent
-      makeMove(customEvent.detail, "ai-player")
+      makeMove(customEvent.detail)
     }
 
     const handleAiBattleship = () => {
@@ -344,13 +207,13 @@ export function useSocket(userId: string | undefined) {
         if (cell === null || cell === "ship") break
       }
       if (x !== undefined && y !== undefined) {
-        makeMove({ x, y }, "ai-player")
+        makeMove({ x, y })
       }
     }
 
     const handleAiRummy = () => {
        // Simple AI for Rummy: Draw then Discard
-       makeMove({ action: "draw", from: "deck" }, "ai-player")
+       makeMove({ action: "draw", from: "deck" })
        setTimeout(() => {
          // Discard a random card (simplified)
          // In a real app we would check hand and discard logic
@@ -359,38 +222,25 @@ export function useSocket(userId: string | undefined) {
     }
 
     const handleAiSecretCode = () => {
-      if (!roomState?.gameState?.secretCode) return
-      
-      const type = roomState.gameState.secretCode.codeType || 'colors'
-      let pool = ["red", "blue", "green", "yellow", "purple", "orange"]
-      if (type === 'numbers') pool = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-      if (type === 'letters') pool = ["A", "B", "C", "D", "E", "F"]
-
+      // Simple AI guess: random colors
+      const colors = ["red", "blue", "green", "yellow", "purple", "orange"]
       const guess = []
       for(let i=0; i<4; i++) {
-        guess.push(pool[Math.floor(Math.random() * pool.length)])
+        guess.push(colors[Math.floor(Math.random() * colors.length)])
       }
-      makeMove({ colors: guess }, "ai-player")
+      makeMove({ colors: guess })
     }
 
     const handleAiGoFish = () => {
       // Simple AI: ask for random rank
       const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
       const rank = ranks[Math.floor(Math.random() * ranks.length)]
-      makeMove({ rank }, "ai-player")
+      makeMove({ rank })
     }
 
     const handleAiWar = () => {
       // War is auto-play usually, but if manual:
-      makeMove({ action: "play" }, "ai-player")
-    }
-
-    const handleAiChess = () => {
-      if (!roomState?.gameState?.chess) return
-      const move = aiChessTurn(roomState.gameState.chess)
-      if (move) {
-        makeMove(move, "ai-player")
-      }
+      makeMove({ action: "play" })
     }
 
     window.addEventListener("ai-move", handleAiMove)
@@ -399,7 +249,6 @@ export function useSocket(userId: string | undefined) {
     window.addEventListener("ai-secret-code-turn", handleAiSecretCode)
     window.addEventListener("ai-go-fish-turn", handleAiGoFish)
     window.addEventListener("ai-war-turn", handleAiWar)
-    window.addEventListener("ai-chess-turn", handleAiChess)
     
     return () => {
       window.removeEventListener("ai-move", handleAiMove)
@@ -408,7 +257,6 @@ export function useSocket(userId: string | undefined) {
       window.removeEventListener("ai-secret-code-turn", handleAiSecretCode)
       window.removeEventListener("ai-go-fish-turn", handleAiGoFish)
       window.removeEventListener("ai-war-turn", handleAiWar)
-      window.removeEventListener("ai-chess-turn", handleAiChess)
     }
   }, [makeMove, roomState])
 
@@ -433,6 +281,111 @@ function generateRoomCode(): string {
   return code
 }
 
+function createInitialGameState(gameType: string, player1Id: string, player2Id: string = "player2"): GameState {
+  const baseState: GameState = {
+    board: [],
+    currentPlayer: player1Id,
+    players: [
+      { id: player1Id, username: "Player 1", symbol: "X" },
+      { id: player2Id, username: player2Id === "ai-player" ? "AI Opponent" : "Player 2", symbol: "O" },
+    ],
+    winner: null,
+    isDraw: false,
+    moveHistory: [],
+  }
+
+  switch (gameType) {
+    case "tic-tac-toe":
+      return {
+        ...baseState,
+        board: Array(3)
+          .fill(null)
+          .map(() => Array(3).fill(null)),
+      }
+    case "connect-4":
+      return {
+        ...baseState,
+        board: Array(6)
+          .fill(null)
+          .map(() => Array(7).fill(null)),
+      }
+    case "connect-3":
+      return {
+        ...baseState,
+        board: Array(4)
+          .fill(null)
+          .map(() => Array(5).fill(null)),
+      }
+    case "gomoku":
+      return {
+        ...baseState,
+        board: Array(15)
+          .fill(null)
+          .map(() => Array(15).fill(null)),
+      }
+    case "secret-code":
+      return {
+        ...baseState,
+        secretCode: initSecretCode(),
+      }
+    case "go-fish":
+      return {
+        ...baseState,
+        goFish: initGoFish(),
+      }
+    case "battleship":
+      return {
+        ...baseState,
+        battleship: initBattleship(),
+      }
+    case "war":
+      return {
+        ...baseState,
+        war: initWar(),
+      }
+    case "rummy":
+      return {
+        ...baseState,
+        rummy: initRummy(),
+      }
+    default:
+      return {
+        ...baseState,
+        board: Array(3)
+          .fill(null)
+          .map(() => Array(3).fill(null)),
+      }
+  }
+}
+
+function applyMove(state: GameState, move: unknown, playerId: string, gameType: string): GameState {
+  switch (gameType) {
+    case "tic-tac-toe":
+      return applyTicTacToeMove(state, move as { x: number; y: number }, playerId)
+    case "connect-4":
+      return applyConnectMove(state, move as { x: number; y: number }, playerId, 4)
+    case "connect-3":
+      return applyConnectMove(state, move as { x: number; y: number }, playerId, 3)
+    case "gomoku":
+      return applyGomokuMove(state, move as { x: number; y: number }, playerId)
+    case "secret-code":
+      return applySecretCodeMove(state, move as { colors: string[] })
+    case "go-fish":
+      return applyGoFishMove(state, move as { rank: string }, playerId)
+    case "battleship":
+      return applyBattleshipMove(
+        state,
+        move as { x: number; y: number; horizontal?: boolean; rotate?: boolean },
+        playerId,
+      )
+    case "war":
+      return applyWarMove(state, move as { action: string })
+    case "rummy":
+      return applyRummyMove(state, move as { action: string; from?: string; cardId?: string }, playerId)
+    default:
+      return state
+  }
+}
 
 // ==================== TIC-TAC-TOE MOVE ====================
 function applyTicTacToeMove(state: GameState, move: { x: number; y: number }, playerId: string): GameState {
@@ -451,7 +404,7 @@ function applyTicTacToeMove(state: GameState, move: { x: number; y: number }, pl
   const winnerPlayer = result.winner ? state.players.find((p) => p.symbol === result.winner)?.id || null : null
   const nextPlayer = state.players.find((p) => p.id !== state.currentPlayer)?.id || state.currentPlayer
 
-  if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
+  if (!result.winner && !result.isDraw && nextPlayer === "player1") {
     setTimeout(() => {
       const aiMove = getAiTicTacToeMove(newBoard)
       if (aiMove) {
@@ -526,7 +479,7 @@ function applyConnectMove(state: GameState, move: { x: number; y: number }, play
   const winnerPlayer = result.winner ? state.players.find((p) => p.symbol === result.winner)?.id || null : null
   const nextPlayer = state.players.find((p) => p.id !== state.currentPlayer)?.id || state.currentPlayer
 
-  if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
+  if (!result.winner && !result.isDraw && nextPlayer === "player1") {
     setTimeout(() => {
       const aiColumn = getAiConnectMove(newBoard, n)
       if (aiColumn !== null) {
@@ -591,7 +544,7 @@ function applyGomokuMove(state: GameState, move: { x: number; y: number }, playe
   const winnerPlayer = result.winner ? state.players.find((p) => p.symbol === result.winner)?.id || null : null
   const nextPlayer = state.players.find((p) => p.id !== state.currentPlayer)?.id || state.currentPlayer
 
-  if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
+  if (!result.winner && !result.isDraw && nextPlayer === "player1") {
     setTimeout(() => {
       const aiMove = getAiGomokuMove(newBoard, { x, y })
       if (aiMove) {

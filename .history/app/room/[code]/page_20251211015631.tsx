@@ -45,7 +45,6 @@ export default function RoomPage() {
 
   const [copied, setCopied] = useState(false)
   const [turnTimer, setTurnTimer] = useState(0)
-  const [showTutorial, setShowTutorial] = useState(true)
 
   const gameTypeFromUrl = searchParams.get("game") || "tic-tac-toe"
 
@@ -283,11 +282,6 @@ export default function RoomPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <GameTutorial 
-        gameType={roomState?.gameType || ""} 
-        open={showTutorial && !!roomState} 
-        onClose={() => setShowTutorial(false)} 
-      />
       {/* Header */}
       <header className="h-16 border-b border-border bg-card px-4 flex items-center justify-between">
         <div className="flex items-center gap-4">

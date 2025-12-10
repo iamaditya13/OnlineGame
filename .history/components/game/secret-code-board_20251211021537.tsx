@@ -89,9 +89,9 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
   return (
     <div className="flex flex-col items-center gap-6 p-6 bg-secondary rounded-xl max-w-md w-full">
       <div className="text-center">
-        <h3 className="font-semibold text-foreground">Secret Code ({type === 'colors' ? 'Colors' : type === 'numbers' ? 'Numbers' : 'Letters'})</h3>
+        <h3 className="font-semibold text-foreground">Secret Code (Mastermind)</h3>
         <p className="text-sm text-muted-foreground">
-          Crack the {SECRET_CODE_LENGTH}-digit code! ({guesses.length}/{maxGuesses} guesses)
+          Crack the {SECRET_CODE_LENGTH}-color code! ({guesses.length}/{maxGuesses} guesses)
         </p>
       </div>
 
@@ -149,9 +149,7 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
       {!gameOver && (
         <>
           {/* Current guess */}
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Guess</span>
-            <div className="flex gap-2">
+          <div className="flex gap-2">
             {currentGuess.map((value, i) => (
               <button
                 key={i}
@@ -164,13 +162,10 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
                 {value ? renderPeg(value, "lg") : <div className="w-12 h-12 bg-card" />}
               </button>
             ))}
-            </div>
           </div>
 
           {/* Color palette */}
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Available Options</span>
-            <div className="flex gap-2 flex-wrap justify-center">
+          <div className="flex gap-2 flex-wrap justify-center">
             {getPool().map((value) => (
               <button
                 key={value}
@@ -183,7 +178,6 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
                 {renderPeg(value, "md")}
               </button>
             ))}
-            </div>
           </div>
 
           <div className="flex gap-2">
@@ -199,16 +193,9 @@ export function SecretCodeBoard({ secretCodeState, onGuess, disabled = false }: 
             </Button>
           </div>
 
-          <div className="text-xs text-muted-foreground text-center bg-card p-2 rounded-lg border border-border">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <div className="w-3 h-3 rounded-full bg-foreground" /> 
-              <span>= Correct Item & Position</span>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-muted-foreground border border-foreground" />
-              <span>= Correct Item, Wrong Position</span>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Black peg = correct color & position | White peg = correct color, wrong position
+          </p>
         </>
       )}
     </div>

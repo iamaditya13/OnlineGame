@@ -283,11 +283,6 @@ export default function RoomPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <GameTutorial 
-        gameType={roomState?.gameType || ""} 
-        open={showTutorial && !!roomState} 
-        onClose={() => setShowTutorial(false)} 
-      />
       {/* Header */}
       <header className="h-16 border-b border-border bg-card px-4 flex items-center justify-between">
         <div className="flex items-center gap-4">

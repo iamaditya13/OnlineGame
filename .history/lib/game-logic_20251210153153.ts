@@ -69,250 +69,6 @@ export function checkTicTacToeWin(board: CellValue[][]): WinResult {
   return { winner: null, isDraw }
 }
 
-// ==================== CHESS ====================
-export type ChessPiece = { type: 'p' | 'r' | 'n' | 'b' | 'q' | 'k'; color: 'w' | 'b' } | null
-export type ChessBoard = ChessPiece[][]
-
-export interface ChessState {
-  board: ChessBoard
-  turn: 'w' | 'b'
-  isCheck: boolean
-  isCheckmate: boolean
-  isDraw: boolean
-  gameOver: boolean
-  winner: string | null
-  lastMove?: { from: { x: number; y: number }; to: { x: number; y: number } }
-  castlingRights: { w: { k: boolean, q: boolean }, b: { k: boolean, q: boolean } }
-  difficulty: 'easy' | 'medium' | 'hard'
-}
-
-export function initChess(difficulty: 'easy' | 'medium' | 'hard' = 'medium'): ChessState {
-  const board: ChessBoard = Array(8).fill(null).map(() => Array(8).fill(null))
-  
-  // Initialize pawns
-  for (let i = 0; i < 8; i++) {
-    board[1][i] = { type: 'p', color: 'b' }
-    board[6][i] = { type: 'p', color: 'w' }
-  }
-
-  // Initialize other pieces
-  const pieces: ('r' | 'n' | 'b' | 'q' | 'k' | 'b' | 'n' | 'r')[] = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
-  for (let i = 0; i < 8; i++) {
-    board[0][i] = { type: pieces[i], color: 'b' }
-    board[7][i] = { type: pieces[i], color: 'w' }
-  }
-
-  return {
-    board,
-    turn: 'w',
-    isCheck: false,
-    isCheckmate: false,
-    isDraw: false,
-    gameOver: false,
-    winner: null,
-    castlingRights: { w: { k: true, q: true }, b: { k: true, q: true } },
-    difficulty
-  }
-}
-
-
-export function isValidChessMove(state: ChessState, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
-  const { board, turn, castlingRights } = state
-  const piece = board[from.x][from.y]
-  if (!piece || piece.color !== turn) return false
-  
-  // Basic bounds check
-  if (to.x < 0 || to.x > 7 || to.y < 0 || to.y > 7) return false
-  
-  // Can't capture own piece
-  const target = board[to.x][to.y]
-  if (target && target.color === turn) return false
-
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const absDx = Math.abs(dx)
-  const absDy = Math.abs(dy)
-
-  switch (piece.type) {
-    case 'p': // Pawn
-      const direction = piece.color === 'w' ? -1 : 1
-      const startRow = piece.color === 'w' ? 6 : 1
-      if (dy === 0 && dx === direction && !target) return true
-      if (dy === 0 && dx === direction * 2 && from.x === startRow && !target && !board[from.x + direction][from.y]) return true
-      if (Math.abs(dy) === 1 && dx === direction && target) return true
-      return false
-    case 'r': // Rook
-      if (dx !== 0 && dy !== 0) return false
-      return isPathClear(board, from, to)
-    case 'n': // Knight
-      return (absDx === 2 && absDy === 1) || (absDx === 1 && absDy === 2)
-    case 'b': // Bishop
-      if (absDx !== absDy) return false
-      return isPathClear(board, from, to)
-    case 'q': // Queen
-      if (dx !== 0 && dy !== 0 && absDx !== absDy) return false
-      return isPathClear(board, from, to)
-    case 'k': // King
-      if (absDx <= 1 && absDy <= 1) return true
-      // Castling
-      if (dy === 0) return false // Must move horizontally
-      if (absDx === 2 && dx === 2) { // Kingside
-        if (!castlingRights[turn].k) return false
-        if (!isPathClear(board, from, { x: from.x, y: 7 })) return false
-        // Check if passing through check (simplified: just check destination and start for now)
-        // In real chess, need to check intermediate square too.
-        return true
-      }
-      if (absDx === 2 && dx === -2) { // Queenside
-        if (!castlingRights[turn].q) return false
-        if (!isPathClear(board, from, { x: from.x, y: 0 })) return false
-        return true
-      }
-      return false
-  }
-  return false
-}
-
-function isPathClear(board: ChessBoard, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
-  const dx = Math.sign(to.x - from.x)
-  const dy = Math.sign(to.y - from.y)
-  
-  let x = from.x + dx
-  let y = from.y + dy
-  
-  while (x !== to.x || y !== to.y) {
-    if (board[x][y]) return false
-    x += dx
-    y += dy
-  }
-  return true
-}
-
-export function applyChessMove(state: ChessState, move: { from: { x: number; y: number }, to: { x: number; y: number } }): ChessState {
-  if (state.gameOver) return state
-  
-  if (!isValidChessMove(state, move.from, move.to)) return state
-
-  const newBoard = state.board.map(row => [...row])
-  const piece = newBoard[move.from.x][move.from.y]!
-  const dx = move.to.x - move.from.x
-  const dy = move.to.y - move.from.y // Wait, x is row, y is col. 
-  // In my board setup: board[row][col]. row 0 is black back rank. row 7 is white back rank.
-  // So x is row (0-7), y is col (0-7).
-  // Castling is horizontal move, so dx should be 0, dy should be +/- 2.
-  // Wait, in isValidChessMove I used dx for castling? 
-  // "if (absDx === 2 && dx === 2)" -> this means row change? No, castling is col change.
-  // My isValidChessMove logic above used dx for castling which is wrong if x is row.
-  // Let's fix isValidChessMove logic in this replacement too? No, I need to fix it in the previous chunk or here.
-  // Actually, let's assume x is row, y is col.
-  // Castling: King moves from (0,4) to (0,6) or (0,2). So x change is 0. y change is +/- 2.
-  // My previous chunk used dx for castling. I need to fix that.
-  
-  // Let's fix the logic here for applyMove first.
-  
-  // Handle Castling Move
-  if (piece.type === 'k' && Math.abs(move.to.y - move.from.y) === 2) {
-    // Kingside
-    if (move.to.y > move.from.y) {
-      newBoard[move.from.x][7] = null
-      newBoard[move.from.x][5] = { type: 'r', color: piece.color }
-    } else { // Queenside
-      newBoard[move.from.x][0] = null
-      newBoard[move.from.x][3] = { type: 'r', color: piece.color }
-    }
-  }
-
-  newBoard[move.to.x][move.to.y] = piece
-  newBoard[move.from.x][move.from.y] = null
-
-  // Update Castling Rights
-  const newCastlingRights = { ...state.castlingRights }
-  if (piece.type === 'k') {
-    newCastlingRights[piece.color].k = false
-    newCastlingRights[piece.color].q = false
-  }
-  if (piece.type === 'r') {
-    if (move.from.y === 0) newCastlingRights[piece.color].q = false
-    if (move.from.y === 7) newCastlingRights[piece.color].k = false
-  }
-
-  // Check for king capture (simplified win condition)
-  const opponentColor = state.turn === 'w' ? 'b' : 'w'
-  let kingFound = false
-  for(let i=0; i<8; i++) {
-    for(let j=0; j<8; j++) {
-      const p = newBoard[i][j]
-      if (p && p.type === 'k' && p.color === opponentColor) {
-        kingFound = true
-      }
-    }
-  }
-
-  const gameOver = !kingFound
-  const winner = gameOver ? (state.turn === 'w' ? 'player1' : 'player2') : null
-
-  return {
-    ...state,
-    board: newBoard,
-    turn: opponentColor,
-    lastMove: move,
-    gameOver,
-    winner,
-    castlingRights: newCastlingRights
-  }
-}
-
-export function aiChessTurn(state: ChessState): { from: { x: number; y: number }, to: { x: number; y: number } } | null {
-  const moves: { from: { x: number; y: number }, to: { x: number; y: number } }[] = []
-  
-  for(let i=0; i<8; i++) {
-    for(let j=0; j<8; j++) {
-      const piece = state.board[i][j]
-      if (piece && piece.color === state.turn) {
-        for(let x=0; x<8; x++) {
-          for(let y=0; y<8; y++) {
-            if (isValidChessMove(state, {x: i, y: j}, {x, y})) {
-              moves.push({ from: {x: i, y: j}, to: {x, y} })
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (moves.length === 0) return null
-
-  // Difficulty Logic
-  if (state.difficulty === 'easy') {
-    return moves[Math.floor(Math.random() * moves.length)]
-  }
-
-  // Medium/Hard: Prioritize captures and checks
-  const scoredMoves = moves.map(move => {
-    let score = 0
-    const target = state.board[move.to.x][move.to.y]
-    if (target) {
-      // Capture value
-      const values: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 }
-      score += values[target.type] * 10
-    }
-    
-    // Check if move puts opponent in check (simple lookahead)
-    // This is expensive, maybe skip for medium?
-    // Let's just do random capture for medium
-    
-    return { move, score }
-  })
-
-  scoredMoves.sort((a, b) => b.score - a.score)
-  
-  // Filter top moves
-  const bestScore = scoredMoves[0].score
-  const bestMoves = scoredMoves.filter(m => m.score === bestScore)
-  
-  return bestMoves[Math.floor(Math.random() * bestMoves.length)].move
-}
-
 // ==================== CONNECT N ====================
 export function checkConnectNWin(board: CellValue[][], n: number): WinResult {
   const rows = board.length
@@ -438,21 +194,14 @@ export interface SecretCodeState {
   isCodeMaker: boolean
   gameOver: boolean
   won: boolean
-  codeType: 'colors' | 'numbers' | 'letters'
 }
 
 export const SECRET_CODE_COLORS = ["red", "blue", "green", "yellow", "purple", "orange"]
-export const SECRET_CODE_NUMBERS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-export const SECRET_CODE_LETTERS = ["A", "B", "C", "D", "E", "F"]
 export const SECRET_CODE_LENGTH = 4
 export const SECRET_CODE_MAX_GUESSES = 10
 
-export function generateSecretCode(length = SECRET_CODE_LENGTH, type: 'colors' | 'numbers' | 'letters' = 'colors'): string[] {
-  let pool = SECRET_CODE_COLORS
-  if (type === 'numbers') pool = SECRET_CODE_NUMBERS
-  if (type === 'letters') pool = SECRET_CODE_LETTERS
-  
-  return Array.from({ length }, () => pool[Math.floor(Math.random() * pool.length)])
+export function generateSecretCode(length = SECRET_CODE_LENGTH): string[] {
+  return Array.from({ length }, () => SECRET_CODE_COLORS[Math.floor(Math.random() * SECRET_CODE_COLORS.length)])
 }
 
 export function evaluateGuess(guess: string[], secretCode: string[]): { correct: number; misplaced: number } {
@@ -482,15 +231,14 @@ export function evaluateGuess(guess: string[], secretCode: string[]): { correct:
   return { correct, misplaced }
 }
 
-export function initSecretCode(type: 'colors' | 'numbers' | 'letters' = 'colors'): SecretCodeState {
+export function initSecretCode(): SecretCodeState {
   return {
-    secretCode: generateSecretCode(SECRET_CODE_LENGTH, type),
+    secretCode: generateSecretCode(SECRET_CODE_LENGTH),
     guesses: [],
     maxGuesses: SECRET_CODE_MAX_GUESSES,
     isCodeMaker: false,
     gameOver: false,
     won: false,
-    codeType: type
   }
 }
 

@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch"
 interface CreateRoomModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateRoom: (gameType: string, mode: string, isAiGame: boolean, difficulty: 'easy' | 'medium' | 'hard') => void
+  onCreateRoom: (gameType: string, mode: string, isAiGame: boolean) => void
   selectedGame?: string
 }
 
@@ -36,8 +36,6 @@ export function CreateRoomModal({ open, onOpenChange, onCreateRoom, selectedGame
   const [gameType, setGameType] = useState(selectedGame || "tic-tac-toe")
   const [mode, setMode] = useState("casual")
   const [isAiGame, setIsAiGame] = useState(false)
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
-  const [variant, setVariant] = useState<'colors' | 'numbers' | 'letters'>('colors')
 
   useEffect(() => {
     if (selectedGame) {
@@ -46,12 +44,7 @@ export function CreateRoomModal({ open, onOpenChange, onCreateRoom, selectedGame
   }, [selectedGame])
 
   const handleCreate = () => {
-    let finalGameType = gameType
-    if (gameType === 'secret-code') {
-      if (variant === 'numbers') finalGameType = 'secret-code-numbers'
-      if (variant === 'letters') finalGameType = 'secret-code-letters'
-    }
-    onCreateRoom(finalGameType, mode, isAiGame, difficulty)
+    onCreateRoom(gameType, mode, isAiGame)
     onOpenChange(false)
   }
 
@@ -81,22 +74,6 @@ export function CreateRoomModal({ open, onOpenChange, onCreateRoom, selectedGame
             </Select>
           </div>
 
-          {gameType === 'secret-code' && (
-            <div className="grid gap-2">
-              <Label className="text-foreground">Code Type</Label>
-              <Select value={variant} onValueChange={(v: 'colors' | 'numbers' | 'letters') => setVariant(v)}>
-                <SelectTrigger className="bg-input border-border text-foreground">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border">
-                  <SelectItem value="colors" className="text-popover-foreground">Colors (Classic)</SelectItem>
-                  <SelectItem value="numbers" className="text-popover-foreground">Numbers (0-9)</SelectItem>
-                  <SelectItem value="letters" className="text-popover-foreground">Letters (A-F)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <div className="flex items-center justify-between space-x-2 border p-4 rounded-lg bg-secondary/50 border-border">
             <Label htmlFor="ai-mode" className="flex flex-col space-y-1 cursor-pointer">
               <span className="font-medium text-foreground">Play against AI</span>
@@ -106,22 +83,6 @@ export function CreateRoomModal({ open, onOpenChange, onCreateRoom, selectedGame
             </Label>
             <Switch id="ai-mode" checked={isAiGame} onCheckedChange={setIsAiGame} />
           </div>
-
-          {isAiGame && (
-            <div className="grid gap-2">
-              <Label className="text-foreground">AI Difficulty</Label>
-              <Select value={difficulty} onValueChange={(v: 'easy' | 'medium' | 'hard') => setDifficulty(v)}>
-                <SelectTrigger className="bg-input border-border text-foreground">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border">
-                  <SelectItem value="easy" className="text-popover-foreground">Easy</SelectItem>
-                  <SelectItem value="medium" className="text-popover-foreground">Medium</SelectItem>
-                  <SelectItem value="hard" className="text-popover-foreground">Hard</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div className="grid gap-2">
             <Label className="text-foreground">Mode</Label>

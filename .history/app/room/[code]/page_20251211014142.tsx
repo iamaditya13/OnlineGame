@@ -20,13 +20,11 @@ import {
   initRummy,
   aiRummyTurn,
 } from "@/lib/game-logic"
-import { TutorialOverlay } from "@/components/ui/tutorial-overlay"
-import { GameTutorial } from "@/components/game/game-tutorial"
 
 const GAME_NAMES: Record<string, string> = {
   "tic-tac-toe": "Tic-Tac-Toe",
   "connect-4": "Connect 4",
-  chess: "Chess",
+  "connect-3": "Connect 3",
   gomoku: "Gomoku",
   "secret-code": "Secret Code",
   "go-fish": "Go Fish",
@@ -45,7 +43,6 @@ export default function RoomPage() {
 
   const [copied, setCopied] = useState(false)
   const [turnTimer, setTurnTimer] = useState(0)
-  const [showTutorial, setShowTutorial] = useState(true)
 
   const gameTypeFromUrl = searchParams.get("game") || "tic-tac-toe"
 
@@ -77,7 +74,7 @@ export default function RoomPage() {
 
           const winner = newGoFishState.gameOver
             ? newGoFishState.playerBooks.length > newGoFishState.opponentBooks.length
-              ? user?._id || null
+              ? user?.id
               : newGoFishState.playerBooks.length < newGoFishState.opponentBooks.length
                 ? "player1"
                 : null
@@ -97,7 +94,7 @@ export default function RoomPage() {
       }, 1500)
       return () => clearTimeout(timer)
     }
-  }, [roomState?.gameState?.goFish, user?._id, setRoomState])
+  }, [roomState?.gameState?.goFish, user?.id, setRoomState])
 
   // Battleship AI
   useEffect(() => {
@@ -116,7 +113,7 @@ export default function RoomPage() {
               battleship: newBattleshipState,
               winner:
                 newBattleshipState.winner === "player"
-                  ? user?._id || null
+                  ? user?.id
                   : newBattleshipState.winner === "opponent"
                     ? "player1"
                     : null,
@@ -126,7 +123,7 @@ export default function RoomPage() {
       }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [roomState?.gameState?.battleship, user?._id, setRoomState])
+  }, [roomState?.gameState?.battleship, user?.id, setRoomState])
 
   useEffect(() => {
     if (!roomState?.gameState?.rummy) return
@@ -143,7 +140,7 @@ export default function RoomPage() {
               ...prev.gameState,
               rummy: newRummyState,
               winner:
-                newRummyState.winner === "player" ? user?._id || null : newRummyState.winner === "opponent" ? "player1" : null,
+                newRummyState.winner === "player" ? user?._id : newRummyState.winner === "opponent" ? "player1" : null,
               isDraw: newRummyState.phase === "finished" && newRummyState.winner === null,
             },
           }
@@ -227,7 +224,7 @@ export default function RoomPage() {
         currentPlayer: roomState.players[0]?.id || "player1",
         players: roomState.gameState?.players || [
           { id: "player1", username: "Player 1", symbol: "X" },
-          { id: user._id, username: "You", symbol: "O" },
+          { id: user.id, username: "You", symbol: "O" },
         ],
         winner: null,
         isDraw: false,
@@ -283,11 +280,6 @@ export default function RoomPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <GameTutorial 
-        gameType={roomState?.gameType || ""} 
-        open={showTutorial && !!roomState} 
-        onClose={() => setShowTutorial(false)} 
-      />
       {/* Header */}
       <header className="h-16 border-b border-border bg-card px-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -306,15 +298,17 @@ export default function RoomPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button
-            onClick={handleRestart}
-            variant="outline"
-            size="sm"
-            className="border-border text-foreground bg-transparent"
-          >
-            <RotateCcw className="h-4 w-4 mr-1" />
-            {isGameOver ? "Play Again" : "Restart"}
-          </Button>
+          {isGameOver && (
+            <Button
+              onClick={handleRestart}
+              variant="outline"
+              size="sm"
+              className="border-border text-foreground bg-transparent"
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Play Again
+            </Button>
+          )}
 
           <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary">
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -394,12 +388,12 @@ export default function RoomPage() {
                 isHost: i === 0,
               }))
             }
-            currentPlayerId={user._id}
+            currentPlayerId={user.id}
             currentTurn={roomState.gameState?.currentPlayer || ""}
           />
 
           <div className="flex-1 min-h-0">
-            <ChatPanel messages={roomState.chat} onSendMessage={sendChat} currentUserId={user._id} />
+            <ChatPanel messages={roomState.chat} onSendMessage={sendChat} currentUserId={user.id} />
           </div>
         </aside>
       </div>

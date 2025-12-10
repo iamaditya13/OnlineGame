@@ -97,12 +97,9 @@ export function MatchCanvas({ gameType, gameState, playerId, onMove }: MatchCanv
           />
         )
       case "secret-code":
-      case "secret-code-numbers":
-      case "secret-code-letters":
-        if (!gameState.secretCode) return <div className="text-muted-foreground">Loading Secret Code...</div>
         return (
           <SecretCodeBoard
-            secretCodeState={gameState.secretCode}
+            secretCodeState={gameState.secretCode!}
             onGuess={(colors) => onMove({ colors })}
             disabled={isGameOver}
           />
