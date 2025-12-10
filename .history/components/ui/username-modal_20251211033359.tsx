@@ -11,10 +11,9 @@ import { Label } from "@/components/ui/label"
 interface UsernameModalProps {
   open: boolean
   onSubmit: (username: string) => void
-  isLoading?: boolean
 }
 
-export function UsernameModal({ open, onSubmit, isLoading = false }: UsernameModalProps) {
+export function UsernameModal({ open, onSubmit }: UsernameModalProps) {
   const [email, setEmail] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -47,7 +46,6 @@ export function UsernameModal({ open, onSubmit, isLoading = false }: UsernameMod
               placeholder="Enter your email"
               className="bg-input border-border text-foreground"
               autoFocus
-              disabled={isLoading}
             />
           </div>
           <Button

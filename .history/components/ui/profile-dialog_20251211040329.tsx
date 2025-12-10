@@ -78,6 +78,7 @@ export function ProfileDialog({ open, onOpenChange, user, onLogout }: ProfileDia
             )}
           </ScrollArea>
         </div>
+      </DialogContent>
       <DialogFooter className="sm:justify-start border-t border-border pt-4 mt-4">
         <Button 
           variant="destructive" 

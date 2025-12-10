@@ -119,7 +119,8 @@ export default function LobbyPage() {
   useEffect(() => {
     const handleOpenTutorial = () => setTutorialOpen(true)
     const handleOpenProfile = () => {
-      refreshUser()
+      // @ts-ignore - refreshUser exists in our modified hook
+      useLocalUser().refreshUser()
       setProfileOpen(true)
     }
 
@@ -130,7 +131,7 @@ export default function LobbyPage() {
       document.removeEventListener("open-tutorial", handleOpenTutorial)
       document.removeEventListener("open-profile", handleOpenProfile)
     }
-  }, [refreshUser])
+  }, [])
 
   const handleTutorialClose = () => {
     setTutorialOpen(false)

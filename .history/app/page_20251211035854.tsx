@@ -98,7 +98,7 @@ const GAMES = [
 
 export default function LobbyPage() {
   const router = useRouter()
-  const { user, isLoading, isSigningIn, createUser, logout, refreshUser } = useLocalUser()
+  const { user, isLoading, createUser } = useLocalUser()
   const { createRoom } = useSocket(user?._id)
 
   const [searchQuery, setSearchQuery] = useState("")
@@ -119,7 +119,8 @@ export default function LobbyPage() {
   useEffect(() => {
     const handleOpenTutorial = () => setTutorialOpen(true)
     const handleOpenProfile = () => {
-      refreshUser()
+      // @ts-ignore - refreshUser exists in our modified hook
+      useLocalUser().refreshUser()
       setProfileOpen(true)
     }
 
@@ -130,7 +131,7 @@ export default function LobbyPage() {
       document.removeEventListener("open-tutorial", handleOpenTutorial)
       document.removeEventListener("open-profile", handleOpenProfile)
     }
-  }, [refreshUser])
+  }, [])
 
   const handleTutorialClose = () => {
     setTutorialOpen(false)
@@ -171,7 +172,7 @@ export default function LobbyPage() {
       <UsernameModal open={!user} onSubmit={createUser} isLoading={isSigningIn} />
       
       <TutorialOverlay open={tutorialOpen} onClose={handleTutorialClose} />
-      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} user={user} onLogout={logout} />
+      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} user={user} />
 
       <CreateRoomModal
         open={createModalOpen}

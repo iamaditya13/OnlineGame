@@ -113,11 +113,6 @@ export function useLocalUser() {
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem("timekill_email")
-  }
-
   return {
     user,
     isLoading,
@@ -125,7 +120,6 @@ export function useLocalUser() {
     createUser,
     updateTutorialStatus,
     recordMatch,
-    refreshUser: () => user && fetchUser(user.email),
-    logout
+    refreshUser: () => user && fetchUser(user.email)
   }
 }

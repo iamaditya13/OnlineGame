@@ -125,7 +125,6 @@ export function useLocalUser() {
     createUser,
     updateTutorialStatus,
     recordMatch,
-    refreshUser: () => user && fetchUser(user.email),
-    logout
+    refreshUser: () => user && fetchUser(user.email)
   }
 }

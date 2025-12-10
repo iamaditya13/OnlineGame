@@ -65,7 +65,7 @@ export function useLocalUser() {
     } catch (error) {
       console.error("Failed to sign in", error)
     } finally {
-      setIsSigningIn(false)
+      setIsLoading(false)
     }
   }
 
@@ -113,11 +113,6 @@ export function useLocalUser() {
     }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem("timekill_email")
-  }
-
   return {
     user,
     isLoading,
@@ -125,7 +120,6 @@ export function useLocalUser() {
     createUser,
     updateTutorialStatus,
     recordMatch,
-    refreshUser: () => user && fetchUser(user.email),
-    logout
+    refreshUser: () => user && fetchUser(user.email)
   }
 }
