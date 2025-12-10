@@ -98,7 +98,7 @@ const GAMES = [
 
 export default function LobbyPage() {
   const router = useRouter()
-  const { user, isLoading, isSigningIn, error, createUser, logout, refreshUser } = useLocalUser()
+  const { user, isLoading, isSigningIn, createUser, logout, refreshUser } = useLocalUser()
   const { createRoom } = useSocket(user?._id)
 
   const [searchQuery, setSearchQuery] = useState("")
