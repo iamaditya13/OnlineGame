@@ -11,49 +11,53 @@ import { Label } from "@/components/ui/label"
 interface UsernameModalProps {
   open: boolean
   onSubmit: (username: string) => void
+  isLoading?: boolean
+  error?: string | null
 }
 
-export function UsernameModal({ open, onSubmit }: UsernameModalProps) {
-  const [username, setUsername] = useState("")
+export function UsernameModal({ open, onSubmit, isLoading = false, error }: UsernameModalProps) {
+  const [email, setEmail] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (username.trim()) {
-      onSubmit(username.trim())
+    if (email.trim()) {
+      onSubmit(email.trim())
     }
   }
 
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-md bg-card border-border" hideCloseButton>
+      <DialogContent className="sm:max-w-md bg-card border-border" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle className="text-foreground">Welcome to TimeKill</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-foreground">Welcome to OnlineGame!</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Choose a username to get started. You can change it later.
+            Enter your email to sign in or create an account.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="username" className="text-foreground">
-              Username
+            <Label htmlFor="email" className="text-foreground">
+              Email
             </Label>
             <Input
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
               className="bg-input border-border text-foreground"
               autoFocus
-              maxLength={20}
+              disabled={isLoading}
             />
+            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
           <Button
             type="submit"
-            disabled={!username.trim()}
+            disabled={!email.trim() || isLoading}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Continue
+            {isLoading ? "Signing in..." : "Continue"}
           </Button>
         </form>
       </DialogContent>

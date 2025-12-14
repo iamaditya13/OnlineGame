@@ -54,10 +54,10 @@ export function UsernameModal({ open, onSubmit, isLoading = false, error }: User
           </div>
           <Button
             type="submit"
-            disabled={!email.trim()}
+            disabled={!email.trim() || isLoading}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Continue
+            {isLoading ? "Signing in..." : "Continue"}
           </Button>
         </form>
       </DialogContent>
