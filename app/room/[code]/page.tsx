@@ -19,6 +19,7 @@ import {
   initWar,
   initRummy,
   aiRummyTurn,
+  initChess,
 } from "@/lib/game-logic"
 import { TutorialOverlay } from "@/components/ui/tutorial-overlay"
 import { GameTutorial } from "@/components/game/game-tutorial"
@@ -205,6 +206,17 @@ export default function RoomPage() {
         winner: null,
         isDraw: false,
       }
+    } else if (gameType === "chess") {
+      newGameState = {
+        ...roomState.gameState!,
+        chess: initChess(roomState.gameState?.difficulty),
+        winner: null,
+        isDraw: false,
+        moveHistory: [],
+        board: [], // Chess uses its own board in chess state, but GameState has a top-level board too. 
+                   // createInitialGameState sets top-level board to empty array for chess.
+                   // Let's match createInitialGameState behavior.
+      }
     } else {
       let rows = 3
       let cols = 3
@@ -233,6 +245,7 @@ export default function RoomPage() {
         isDraw: false,
         moveHistory: [],
         winningCells: [],
+        difficulty: roomState.gameState?.difficulty || 'medium'
       }
     }
 

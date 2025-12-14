@@ -41,6 +41,7 @@ export interface GameState {
   moveHistory: { playerId: string; move: unknown; timestamp: number }[]
   winningCells?: { x: number; y: number }[]
   lastMove?: { x: number; y: number }
+  difficulty: 'easy' | 'medium' | 'hard'
   secretCode?: SecretCodeState
   goFish?: GoFishState
   battleship?: BattleshipState
@@ -61,6 +62,7 @@ function createInitialGameState(gameType: string, player1Id: string, player2Id: 
     winner: null,
     isDraw: false,
     moveHistory: [],
+    difficulty
   }
 
   switch (gameType) {
@@ -469,7 +471,7 @@ function applyTicTacToeMove(state: GameState, move: { x: number; y: number }, pl
 
   if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
     setTimeout(() => {
-      const aiMove = getAiTicTacToeMove(newBoard)
+      const aiMove = getAiTicTacToeMove(newBoard, state.difficulty)
       if (aiMove) {
         window.dispatchEvent(new CustomEvent("ai-move", { detail: aiMove }))
       }
@@ -488,7 +490,7 @@ function applyTicTacToeMove(state: GameState, move: { x: number; y: number }, pl
   }
 }
 
-function getAiTicTacToeMove(board: (string | null)[][]): { x: number; y: number } | null {
+function getAiTicTacToeMove(board: (string | null)[][], difficulty: 'easy' | 'medium' | 'hard'): { x: number; y: number } | null {
   const emptyCells: { x: number; y: number }[] = []
 
   for (let i = 0; i < 3; i++) {
@@ -499,29 +501,78 @@ function getAiTicTacToeMove(board: (string | null)[][]): { x: number; y: number 
 
   if (emptyCells.length === 0) return null
 
-  for (const cell of emptyCells) {
-    const testBoard = board.map((r, i) => r.map((c, j) => (i === cell.x && j === cell.y ? "X" : c)))
-    if (checkTicTacToeWin(testBoard).winner === "X") return cell
+  // Easy: Random move
+  if (difficulty === 'easy') {
+    return emptyCells[Math.floor(Math.random() * emptyCells.length)]
   }
 
+  // Medium: Win if can, Block if must, else Random
+  // Hard: Minimax (Unbeatable)
+
+  // Check for winning move (AI is 'O')
   for (const cell of emptyCells) {
     const testBoard = board.map((r, i) => r.map((c, j) => (i === cell.x && j === cell.y ? "O" : c)))
     if (checkTicTacToeWin(testBoard).winner === "O") return cell
   }
 
-  if (board[1][1] === null) return { x: 1, y: 1 }
-
-  const corners = [
-    { x: 0, y: 0 },
-    { x: 0, y: 2 },
-    { x: 2, y: 0 },
-    { x: 2, y: 2 },
-  ]
-  for (const corner of corners) {
-    if (board[corner.x][corner.y] === null) return corner
+  // Check for blocking move (Player is 'X')
+  for (const cell of emptyCells) {
+    const testBoard = board.map((r, i) => r.map((c, j) => (i === cell.x && j === cell.y ? "X" : c)))
+    if (checkTicTacToeWin(testBoard).winner === "X") return cell
   }
 
-  return emptyCells[Math.floor(Math.random() * emptyCells.length)]
+  if (difficulty === 'medium') {
+     if (board[1][1] === null) return { x: 1, y: 1 }
+     return emptyCells[Math.floor(Math.random() * emptyCells.length)]
+  }
+
+  // Hard: Minimax
+  let bestScore = -Infinity
+  let bestMove = null
+
+  for (const cell of emptyCells) {
+    const testBoard = board.map((r, i) => r.map((c, j) => (i === cell.x && j === cell.y ? "O" : c)))
+    const score = minimaxTicTacToe(testBoard, 0, false)
+    if (score > bestScore) {
+      bestScore = score
+      bestMove = cell
+    }
+  }
+
+  return bestMove || emptyCells[Math.floor(Math.random() * emptyCells.length)]
+}
+
+function minimaxTicTacToe(board: (string | null)[][], depth: number, isMaximizing: boolean): number {
+  const result = checkTicTacToeWin(board)
+  if (result.winner === "O") return 10 - depth
+  if (result.winner === "X") return depth - 10
+  if (result.isDraw) return 0
+
+  if (isMaximizing) {
+    let bestScore = -Infinity
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (board[i][j] === null) {
+          const newBoard = board.map((r, rI) => r.map((c, cI) => (rI === i && cI === j ? "O" : c)))
+          const score = minimaxTicTacToe(newBoard, depth + 1, false)
+          bestScore = Math.max(score, bestScore)
+        }
+      }
+    }
+    return bestScore
+  } else {
+    let bestScore = Infinity
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (board[i][j] === null) {
+          const newBoard = board.map((r, rI) => r.map((c, cI) => (rI === i && cI === j ? "X" : c)))
+          const score = minimaxTicTacToe(newBoard, depth + 1, true)
+          bestScore = Math.min(score, bestScore)
+        }
+      }
+    }
+    return bestScore
+  }
 }
 
 // ==================== CONNECT N MOVE ====================
@@ -544,7 +595,7 @@ function applyConnectMove(state: GameState, move: { x: number; y: number }, play
 
   if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
     setTimeout(() => {
-      const aiColumn = getAiConnectMove(newBoard, n)
+      const aiColumn = getAiConnectMove(newBoard, n, state.difficulty)
       if (aiColumn !== null) {
         window.dispatchEvent(new CustomEvent("ai-move", { detail: { x: 0, y: aiColumn } }))
       }
@@ -563,7 +614,7 @@ function applyConnectMove(state: GameState, move: { x: number; y: number }, play
   }
 }
 
-function getAiConnectMove(board: (string | null)[][], n: number): number | null {
+function getAiConnectMove(board: (string | null)[][], n: number, difficulty: 'easy' | 'medium' | 'hard'): number | null {
   const cols = board[0].length
   const validColumns: number[] = []
 
@@ -573,21 +624,82 @@ function getAiConnectMove(board: (string | null)[][], n: number): number | null 
 
   if (validColumns.length === 0) return null
 
-  for (const col of validColumns) {
-    const result = dropPiece(board, col, "X")
-    if (result && checkConnectNWin(result.newBoard, n).winner === "X") return col
+  // Easy: Random
+  if (difficulty === 'easy') {
+    return validColumns[Math.floor(Math.random() * validColumns.length)]
   }
 
+  // Medium/Hard: Check for immediate wins/blocks
   for (const col of validColumns) {
-    const result = dropPiece(board, col, "O")
+    const result = dropPiece(board, col, "O") // AI
     if (result && checkConnectNWin(result.newBoard, n).winner === "O") return col
   }
 
-  const centerCol = Math.floor(cols / 2)
-  if (validColumns.includes(centerCol)) return centerCol
+  for (const col of validColumns) {
+    const result = dropPiece(board, col, "X") // Player
+    if (result && checkConnectNWin(result.newBoard, n).winner === "X") return col
+  }
 
-  return validColumns[Math.floor(Math.random() * validColumns.length)]
+  // Medium: Center bias + Random
+  if (difficulty === 'medium') {
+    const centerCol = Math.floor(cols / 2)
+    if (validColumns.includes(centerCol) && Math.random() > 0.3) return centerCol
+    return validColumns[Math.floor(Math.random() * validColumns.length)]
+  }
+
+  // Hard: Minimax with depth limit
+  let bestScore = -Infinity
+  let bestCol = validColumns[0]
+
+  for (const col of validColumns) {
+    const result = dropPiece(board, col, "O")
+    if (result) {
+       const score = minimaxConnect(result.newBoard, 4, false, 0, n)
+       if (score > bestScore) {
+         bestScore = score
+         bestCol = col
+       }
+    }
+  }
+  return bestCol
 }
+
+function minimaxConnect(board: (string | null)[][], depth: number, isMaximizing: boolean, currentDepth: number, n: number): number {
+  const result = checkConnectNWin(board, n)
+  if (result.winner === "O") return 1000 - currentDepth
+  if (result.winner === "X") return currentDepth - 1000
+  if (result.isDraw) return 0
+  if (currentDepth >= 4) return 0 // Depth limit
+
+  const cols = board[0].length
+  const validColumns: number[] = []
+  for (let c = 0; c < cols; c++) {
+    if (board[0][c] === null) validColumns.push(c)
+  }
+
+  if (isMaximizing) {
+    let bestScore = -Infinity
+    for (const col of validColumns) {
+      const res = dropPiece(board, col, "O")
+      if (res) {
+        const score = minimaxConnect(res.newBoard, depth, false, currentDepth + 1, n)
+        bestScore = Math.max(score, bestScore)
+      }
+    }
+    return bestScore
+  } else {
+    let bestScore = Infinity
+    for (const col of validColumns) {
+      const res = dropPiece(board, col, "X")
+      if (res) {
+        const score = minimaxConnect(res.newBoard, depth, true, currentDepth + 1, n)
+        bestScore = Math.min(score, bestScore)
+      }
+    }
+    return bestScore
+  }
+}
+
 
 // ==================== GOMOKU MOVE ====================
 function applyGomokuMove(state: GameState, move: { x: number; y: number }, playerId: string): GameState {
@@ -609,7 +721,7 @@ function applyGomokuMove(state: GameState, move: { x: number; y: number }, playe
 
   if (!result.winner && !result.isDraw && nextPlayer === "ai-player") {
     setTimeout(() => {
-      const aiMove = getAiGomokuMove(newBoard, { x, y })
+      const aiMove = getAiGomokuMove(newBoard, { x, y }, state.difficulty)
       if (aiMove) {
         window.dispatchEvent(new CustomEvent("ai-move", { detail: aiMove }))
       }
@@ -631,8 +743,22 @@ function applyGomokuMove(state: GameState, move: { x: number; y: number }, playe
 function getAiGomokuMove(
   board: (string | null)[][],
   lastMove: { x: number; y: number },
+  difficulty: 'easy' | 'medium' | 'hard'
 ): { x: number; y: number } | null {
   const size = board.length
+  
+  // Easy: Random near center or random valid
+  if (difficulty === 'easy') {
+     const candidates: { x: number; y: number }[] = []
+     for(let i=0; i<size; i++) {
+        for(let j=0; j<size; j++) {
+           if (board[i][j] === null) candidates.push({x: i, y: j})
+        }
+     }
+     if (candidates.length === 0) return null
+     return candidates[Math.floor(Math.random() * candidates.length)]
+  }
+
   const candidates: { x: number; y: number; score: number }[] = []
 
   for (let i = 0; i < size; i++) {
@@ -642,6 +768,7 @@ function getAiGomokuMove(
       let hasNeighbor = false
       let score = 0
 
+      // Check neighborhood
       for (let di = -2; di <= 2; di++) {
         for (let dj = -2; dj <= 2; dj++) {
           const ni = i + di
@@ -652,6 +779,22 @@ function getAiGomokuMove(
             else score += 1
           }
         }
+      }
+      
+      if (difficulty === 'hard') {
+         // Defensive check: if opponent has 3 or 4 in a row, block it!
+         // This is a simplified check. A real Gomoku AI needs full evaluation.
+         // Let's simulate placing 'X' (opponent) here and see if they win or get close
+         const testBoardX = board.map(r => [...r])
+         testBoardX[i][j] = "X"
+         const winX = checkGomokuWin(testBoardX, {x: i, y: j})
+         if (winX.winner === "X") score += 1000 // Must block win
+
+         // Offensive check: if we can win
+         const testBoardO = board.map(r => [...r])
+         testBoardO[i][j] = "O"
+         const winO = checkGomokuWin(testBoardO, {x: i, y: j})
+         if (winO.winner === "O") score += 2000 // Win immediately
       }
 
       if (hasNeighbor) candidates.push({ x: i, y: j, score })

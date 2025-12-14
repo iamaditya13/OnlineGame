@@ -263,12 +263,67 @@ export function applyChessMove(state: ChessState, move: { from: { x: number; y: 
 }
 
 export function aiChessTurn(state: ChessState): { from: { x: number; y: number }, to: { x: number; y: number } } | null {
+  const moves = getAllValidMoves(state, state.turn)
+
+  if (moves.length === 0) return null
+
+  // Easy: Random move
+  if (state.difficulty === 'easy') {
+    return moves[Math.floor(Math.random() * moves.length)]
+  }
+
+  // Medium: Greedy (capture best piece)
+  if (state.difficulty === 'medium') {
+    let bestScore = -Infinity
+    let bestMoves: typeof moves = []
+
+    for (const move of moves) {
+      const target = state.board[move.to.x][move.to.y]
+      let score = 0
+      if (target) {
+        score = getPieceValue(target.type) * 10
+      }
+      // Small random factor to vary play
+      score += Math.random()
+
+      if (score > bestScore) {
+        bestScore = score
+        bestMoves = [move]
+      } else if (score === bestScore) {
+        bestMoves.push(move)
+      }
+    }
+    return bestMoves[Math.floor(Math.random() * bestMoves.length)]
+  }
+
+  // Hard: Minimax with Alpha-Beta Pruning (Depth 3)
+  // Note: Depth 3 can be slow in JS without optimization, but 8x8 chess is complex.
+  // We'll try depth 2 first for responsiveness, or 3 if optimized.
+  // Let's stick to depth 2 for now to ensure it doesn't hang the browser.
+  let bestScore = -Infinity
+  let bestMove = moves[0]
+  const depth = 2 
+
+  for (const move of moves) {
+    // Simulate move
+    const nextState = simulateMove(state, move)
+    const score = minimaxChess(nextState, depth - 1, -Infinity, Infinity, false)
+    
+    if (score > bestScore) {
+      bestScore = score
+      bestMove = move
+    }
+  }
+
+  return bestMove
+}
+
+function getAllValidMoves(state: ChessState, turn: 'w' | 'b'): { from: { x: number; y: number }, to: { x: number; y: number } }[] {
   const moves: { from: { x: number; y: number }, to: { x: number; y: number } }[] = []
-  
   for(let i=0; i<8; i++) {
     for(let j=0; j<8; j++) {
       const piece = state.board[i][j]
-      if (piece && piece.color === state.turn) {
+      if (piece && piece.color === turn) {
         for(let x=0; x<8; x++) {
           for(let y=0; y<8; y++) {
             if (isValidChessMove(state, {x: i, y: j}, {x, y})) {
@@ -279,38 +334,103 @@ export function aiChessTurn(state: ChessState): { from: { x: number; y: number }
       }
     }
   }
+  return moves
+}
 
-  if (moves.length === 0) return null
-
-  // Difficulty Logic
-  if (state.difficulty === 'easy') {
-    return moves[Math.floor(Math.random() * moves.length)]
+function simulateMove(state: ChessState, move: { from: { x: number; y: number }, to: { x: number; y: number } }): ChessState {
+  // Simplified applyMove for AI simulation (skips some checks for speed)
+  const newBoard = state.board.map(row => [...row])
+  const piece = newBoard[move.from.x][move.from.y]!
+  
+  // Handle Castling (simplified)
+  if (piece.type === 'k' && Math.abs(move.to.y - move.from.y) === 2) {
+    if (move.to.y > move.from.y) { // Kingside
+      newBoard[move.from.x][7] = null
+      newBoard[move.from.x][5] = { type: 'r', color: piece.color }
+    } else { // Queenside
+      newBoard[move.from.x][0] = null
+      newBoard[move.from.x][3] = { type: 'r', color: piece.color }
+    }
   }
 
-  // Medium/Hard: Prioritize captures and checks
-  const scoredMoves = moves.map(move => {
-    let score = 0
-    const target = state.board[move.to.x][move.to.y]
-    if (target) {
-      // Capture value
-      const values: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 }
-      score += values[target.type] * 10
-    }
-    
-    // Check if move puts opponent in check (simple lookahead)
-    // This is expensive, maybe skip for medium?
-    // Let's just do random capture for medium
-    
-    return { move, score }
-  })
+  newBoard[move.to.x][move.to.y] = piece
+  newBoard[move.from.x][move.from.y] = null
+  
+  return {
+    ...state,
+    board: newBoard,
+    turn: state.turn === 'w' ? 'b' : 'w'
+  }
+}
 
-  scoredMoves.sort((a, b) => b.score - a.score)
-  
-  // Filter top moves
-  const bestScore = scoredMoves[0].score
-  const bestMoves = scoredMoves.filter(m => m.score === bestScore)
-  
-  return bestMoves[Math.floor(Math.random() * bestMoves.length)].move
+function minimaxChess(state: ChessState, depth: number, alpha: number, beta: number, isMaximizing: boolean): number {
+  if (depth === 0) {
+    return evaluateBoard(state.board)
+  }
+
+  const moves = getAllValidMoves(state, state.turn)
+  if (moves.length === 0) {
+    // Checkmate or Stalemate logic could go here
+    return evaluateBoard(state.board)
+  }
+
+  if (isMaximizing) {
+    let maxEval = -Infinity
+    for (const move of moves) {
+      const nextState = simulateMove(state, move)
+      const evalScore = minimaxChess(nextState, depth - 1, alpha, beta, false)
+      maxEval = Math.max(maxEval, evalScore)
+      alpha = Math.max(alpha, evalScore)
+      if (beta <= alpha) break
+    }
+    return maxEval
+  } else {
+    let minEval = Infinity
+    for (const move of moves) {
+      const nextState = simulateMove(state, move)
+      const evalScore = minimaxChess(nextState, depth - 1, alpha, beta, true)
+      minEval = Math.min(minEval, evalScore)
+      beta = Math.min(beta, evalScore)
+      if (beta <= alpha) break
+    }
+    return minEval
+  }
+}
+
+function getPieceValue(type: string): number {
+  const values: Record<string, number> = { p: 10, n: 30, b: 30, r: 50, q: 90, k: 900 }
+  return values[type] || 0
+}
+
+function evaluateBoard(board: ChessBoard): number {
+  let score = 0
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const piece = board[i][j]
+      if (piece) {
+        const value = getPieceValue(piece.type)
+        // Position bonuses (simplified)
+        let positionBonus = 0
+        if (piece.type === 'p') {
+           // Advance pawns bonus
+           positionBonus = (piece.color === 'w' ? (6 - i) : (i - 1)) * 1 
+           // Center control
+           if (j > 2 && j < 5 && i > 2 && i < 5) positionBonus += 2
+        }
+        if (piece.type === 'n' || piece.type === 'b') {
+           // Develop minor pieces
+           if (j > 1 && j < 6 && i > 1 && i < 6) positionBonus += 2
+        }
+
+        if (piece.color === 'b') { // AI is usually black in this context ('b')
+           score += value + positionBonus
+        } else {
+           score -= (value + positionBonus)
+        }
+      }
+    }
+  }
+  return score
 }
 
 // ==================== CONNECT N ====================

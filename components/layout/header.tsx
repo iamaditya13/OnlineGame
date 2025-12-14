@@ -43,14 +43,10 @@ export function Header({ username, onCreateRoom, searchQuery, onSearchChange }: 
         </Button>
 
         {username && (
-          <Button 
-            variant="ghost" 
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 h-auto"
-            onClick={() => document.dispatchEvent(new CustomEvent("open-profile"))}
-          >
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary h-auto">
             <User className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-foreground">{username}</span>
-          </Button>
+          </div>
         )}
       </div>
     </header>

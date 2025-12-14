@@ -4,15 +4,9 @@ import { useState, useEffect } from "react"
 
 export interface LocalUser {
   _id: string
-  email: string
   username: string
   wins: number
   losses: number
-  matchHistory?: {
-    gameId: string
-    result: "win" | "loss" | "draw"
-    date: string
-  }[]
   hasSeenTutorial: boolean
   createdAt: string
 }
@@ -20,119 +14,68 @@ export interface LocalUser {
 export function useLocalUser() {
   const [user, setUser] = useState<LocalUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSigningIn, setIsSigningIn] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const storedEmail = localStorage.getItem("timekill_email")
-    if (storedEmail) {
-      fetchUser(storedEmail)
-    } else {
-      setIsLoading(false)
+    const storedUser = localStorage.getItem("timekill_user")
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser))
+      } catch (e) {
+        console.error("Failed to parse user", e)
+        localStorage.removeItem("timekill_user")
+      }
     }
+    setIsLoading(false)
   }, [])
 
-  const fetchUser = async (email: string) => {
-    try {
-      const res = await fetch(`/api/user?email=${encodeURIComponent(email)}`)
-      if (res.ok) {
-        const userData = await res.json()
-        setUser(userData)
-      } else {
-        localStorage.removeItem("timekill_email")
-      }
-    } catch (error) {
-      console.error("Failed to fetch user", error)
-    } finally {
-      setIsLoading(false)
+  const createUser = (username: string) => {
+    const newUser: LocalUser = {
+      _id: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      username,
+      wins: 0,
+      losses: 0,
+      hasSeenTutorial: false,
+      createdAt: new Date().toISOString(),
     }
+    
+    localStorage.setItem("timekill_user", JSON.stringify(newUser))
+    setUser(newUser)
+    return newUser
   }
 
-  const createUser = async (email: string) => {
-    setIsSigningIn(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/auth/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      })
-      
-      if (res.ok) {
-        const newUser = await res.json()
-        localStorage.setItem("timekill_email", newUser.email)
-        setUser(newUser)
-        return newUser
-      } else {
-        const data = await res.json()
-        setError(data.error || "Failed to sign in. Please try again.")
-      }
-    } catch (error) {
-      console.error("Failed to sign in", error)
-      setError("An error occurred. Please check your connection.")
-    } finally {
-      setIsSigningIn(false)
-    }
-  }
-
-  const updateTutorialStatus = async (hasSeen: boolean) => {
+  const updateTutorialStatus = (hasSeen: boolean) => {
     if (!user) return
     
-    try {
-      const res = await fetch("/api/user", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email, hasSeenTutorial: hasSeen }),
-      })
-      
-      if (res.ok) {
-        const updatedUser = await res.json()
-        setUser(updatedUser)
-      }
-    } catch (error) {
-      console.error("Failed to update tutorial status", error)
-    }
+    const updatedUser = { ...user, hasSeenTutorial: hasSeen }
+    localStorage.setItem("timekill_user", JSON.stringify(updatedUser))
+    setUser(updatedUser)
   }
 
-  const recordMatch = async (gameId: string, result: "win" | "loss" | "draw") => {
+  const recordMatch = (gameId: string, result: "win" | "loss" | "draw") => {
     if (!user) return
 
-    try {
-      const res = await fetch("/api/match/record", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user._id, gameId, result }),
-      })
-
-      if (res.ok) {
-        const updatedUser = await res.json()
-        setUser(updatedUser)
-      }
-    } catch (error) {
-      console.error("Failed to record match", error)
-    }
-  }
-
-  const refreshUser = async () => {
-    if (user?.email) {
-      await fetchUser(user.email)
-    }
+    const updatedUser = { ...user }
+    if (result === "win") updatedUser.wins += 1
+    if (result === "loss") updatedUser.losses += 1
+    
+    localStorage.setItem("timekill_user", JSON.stringify(updatedUser))
+    setUser(updatedUser)
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem("timekill_email")
+    localStorage.removeItem("timekill_user")
   }
 
   return {
     user,
     isLoading,
-    isSigningIn,
-    error,
+    isSigningIn: false, // Kept for compatibility
+    error: null, // Kept for compatibility
     createUser,
     updateTutorialStatus,
     recordMatch,
-    refreshUser: () => user && fetchUser(user.email),
+    refreshUser: () => {}, // No-op for local user
     logout
   }
 }

@@ -16,12 +16,12 @@ interface UsernameModalProps {
 }
 
 export function UsernameModal({ open, onSubmit, isLoading = false, error }: UsernameModalProps) {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (email.trim()) {
-      onSubmit(email.trim())
+    if (username.trim()) {
+      onSubmit(username.trim())
     }
   }
 
@@ -31,33 +31,34 @@ export function UsernameModal({ open, onSubmit, isLoading = false, error }: User
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-foreground">Welcome to OnlineGame!</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Enter your email to sign in or create an account.
+            Enter a username to start playing.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="email" className="text-foreground">
-              Email
+            <Label htmlFor="username" className="text-foreground">
+              Username
             </Label>
             <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your username"
               className="bg-input border-border text-foreground"
               autoFocus
               disabled={isLoading}
+              maxLength={15}
             />
             {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
           <Button
             type="submit"
-            disabled={!email.trim() || isLoading}
+            disabled={!username.trim() || isLoading}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {isLoading ? "Signing in..." : "Continue"}
+            {isLoading ? "Joining..." : "Start Playing"}
           </Button>
         </form>
       </DialogContent>
