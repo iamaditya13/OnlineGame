@@ -103,8 +103,16 @@ export function MatchCanvas({ gameType, gameState, playerId, onMove }: MatchCanv
         return (
           <SecretCodeBoard
             secretCodeState={gameState.secretCode}
-            onGuess={(colors) => onMove({ colors })}
+            onGuess={(colors) => {
+              if (gameState.secretCode?.phase === "setup") {
+                onMove({ action: "setSecret", code: colors })
+              } else {
+                onMove({ action: "guess", code: colors })
+              }
+            }}
             disabled={isGameOver}
+            playerId={playerId}
+            isPlayer1={gameState.players?.[0]?.id === playerId}
           />
         )
       case "go-fish":

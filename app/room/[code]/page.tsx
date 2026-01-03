@@ -185,10 +185,14 @@ export default function RoomPage() {
         winner: null,
         isDraw: false,
       }
-    } else if (gameType === "secret-code") {
+    } else if (gameType.startsWith("secret-code")) {
+      let codeType: 'colors' | 'numbers' | 'letters' = 'colors'
+      if (gameType === "secret-code-numbers") codeType = 'numbers'
+      if (gameType === "secret-code-letters") codeType = 'letters'
+
       newGameState = {
         ...roomState.gameState!,
-        secretCode: initSecretCode(),
+        secretCode: initSecretCode(codeType),
         winner: null,
         isDraw: false,
       }
@@ -302,15 +306,18 @@ export default function RoomPage() {
         onClose={() => setShowTutorial(false)} 
       />
       {/* Header */}
-      <header className="h-16 border-b border-border bg-card px-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleLeave} className="text-foreground">
-            <ArrowLeft className="h-5 w-5" />
+      <header className="min-h-16 h-auto border-b border-border bg-card px-3 py-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <Button variant="ghost" size="icon" onClick={handleLeave} className="text-foreground shrink-0 w-8 h-8 sm:w-10 sm:h-10">
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
-          <div>
-            <h1 className="font-semibold text-foreground">{GAME_NAMES[roomState.gameType] || roomState.gameType}</h1>
+          <div className="min-w-0">
+            <h1 className="font-semibold text-foreground text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
+              {GAME_NAMES[roomState.gameType] || roomState.gameType}
+            </h1>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Room: {code}</span>
+              <span className="text-xs text-muted-foreground hidden sm:inline">Room:</span>
+              <span className="text-xs text-muted-foreground font-mono">{code}</span>
               <button onClick={handleCopyCode} className="text-primary hover:text-primary/80 transition-colors">
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </button>
@@ -318,25 +325,25 @@ export default function RoomPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
           <Button
             onClick={handleRestart}
             variant="outline"
             size="sm"
-            className="border-border text-foreground bg-transparent"
+            className="border-border text-foreground bg-transparent h-8 px-2 sm:px-4 text-xs sm:text-sm"
           >
-            <RotateCcw className="h-4 w-4 mr-1" />
-            {isGameOver ? "Play Again" : "Restart"}
+            <RotateCcw className="h-3.5 w-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">{isGameOver ? "Play Again" : "Restart"}</span>
           </Button>
 
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="font-mono text-foreground">{formatTime(turnTimer)}</span>
+          <div className="flex items-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-lg bg-secondary">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="font-mono text-foreground text-xs sm:text-sm">{formatTime(turnTimer)}</span>
           </div>
 
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span className="text-sm">{roomState.players.length} / 2</span>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span className="text-xs sm:text-sm">{roomState.players.length}/2</span>
           </div>
         </div>
       </header>
@@ -380,14 +387,14 @@ export default function RoomPage() {
 
           {/* Move History - only for grid-based games */}
           {roomState.gameState &&
-            roomState.gameState.moveHistory.length > 0 &&
+            (roomState.gameState.moveHistory?.length || 0) > 0 &&
             !["go-fish", "battleship", "secret-code", "war", "rummy"].includes(roomState.gameType) && (
               <div className="mt-4 p-4 bg-card rounded-lg border border-border">
                 <h3 className="text-sm font-semibold text-foreground mb-2">Move History</h3>
                 <div className="flex gap-2 flex-wrap">
-                  {roomState.gameState.moveHistory.slice(-10).map((move, i) => (
+                  {(roomState.gameState.moveHistory || []).slice(-10).map((move, i) => (
                     <span key={i} className="px-2 py-1 bg-secondary rounded text-xs text-muted-foreground">
-                      {roomState.gameState!.moveHistory.length - 10 + i + 1}. (
+                      {(roomState.gameState!.moveHistory?.length || 0) - 10 + i + 1}. (
                       {(move.move as { x: number; y: number }).x},{(move.move as { x: number; y: number }).y})
                     </span>
                   ))}

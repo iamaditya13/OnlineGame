@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Production ready: Enable strict checks, remove ignoreBuildErrors
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, 
   },
   images: {
     unoptimized: true,

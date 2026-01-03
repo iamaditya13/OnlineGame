@@ -98,7 +98,7 @@ const GAMES = [
 
 export default function LobbyPage() {
   const router = useRouter()
-  const { user, isLoading, isSigningIn, error, createUser, logout, refreshUser } = useLocalUser()
+  const { user, isLoading, isSigningIn, error, createUser, logout, refreshUser, updateTutorialStatus } = useLocalUser()
   const { createRoom } = useSocket(user?._id)
 
   const [searchQuery, setSearchQuery] = useState("")
@@ -135,8 +135,7 @@ export default function LobbyPage() {
   const handleTutorialClose = () => {
     setTutorialOpen(false)
     if (user && !user.hasSeenTutorial) {
-      // @ts-ignore - updateTutorialStatus exists in our modified hook
-      useLocalUser().updateTutorialStatus(true)
+      updateTutorialStatus(true)
     }
   }
 
@@ -187,7 +186,7 @@ export default function LobbyPage() {
         onSearchChange={setSearchQuery}
       />
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex flex-col lg:flex-row">
         <SidebarFilters selectedFilter={selectedFilter} onFilterChange={setSelectedFilter} />
 
         <main className="flex-1 p-6 overflow-auto">

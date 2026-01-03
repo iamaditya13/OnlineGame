@@ -24,6 +24,8 @@ import {
   initChess,
   applyChessMove,
   aiChessTurn,
+  applySecretCodeMove,
+  aiSecretCodeTurn,
   type SecretCodeState,
   type GoFishState,
   type BattleshipState,
@@ -164,7 +166,17 @@ function applyMove(state: GameState, move: unknown, playerId: string, gameType: 
     case "secret-code":
     case "secret-code-numbers":
     case "secret-code-letters":
-      return applySecretCodeMove(state, move as { colors: string[] })
+      const scState = applySecretCodeMove(
+        state.secretCode!,
+        move as { action: "setSecret" | "guess"; code: string[] },
+        playerId,
+        playerId === state.players?.[0]?.id,
+      )
+      return {
+        ...state,
+        secretCode: scState,
+        winner: scState.winner === state.players?.[0]?.id ? "player1" : scState.winner === state.players?.[1]?.id ? "player2" : null,
+      }
     case "go-fish":
       return applyGoFishMove(state, move as { rank: string }, playerId)
     case "battleship":
@@ -342,6 +354,24 @@ export function useSocket(userId: string | undefined) {
     }
   }, [roomState?.gameState?.winner, roomState?.gameState?.isDraw])
 
+  // AI Watcher
+  useEffect(() => {
+    if (!roomState?.isAiGame || !roomState.gameState) return
+
+    if (roomState.gameType.startsWith("secret-code") && roomState.gameState.secretCode) {
+      const sc = roomState.gameState.secretCode
+      const isAiTurn = (sc.phase === "setup" && !sc.player2Secret) || 
+                       (sc.phase === "playing" && sc.currentPlayer === "player2")
+      
+      if (isAiTurn) {
+        const timer = setTimeout(() => {
+             window.dispatchEvent(new CustomEvent("ai-secret-code-turn"))
+        }, 1000)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [roomState])
+
   useEffect(() => {
     const handleAiMove = (e: Event) => {
       const customEvent = e as CustomEvent
@@ -379,16 +409,10 @@ export function useSocket(userId: string | undefined) {
     const handleAiSecretCode = () => {
       if (!roomState?.gameState?.secretCode) return
       
-      const type = roomState.gameState.secretCode.codeType || 'colors'
-      let pool = ["red", "blue", "green", "yellow", "purple", "orange"]
-      if (type === 'numbers') pool = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-      if (type === 'letters') pool = ["A", "B", "C", "D", "E", "F"]
-
-      const guess = []
-      for(let i=0; i<4; i++) {
-        guess.push(pool[Math.floor(Math.random() * pool.length)])
+      const move = aiSecretCodeTurn(roomState.gameState.secretCode, false)
+      if (move) {
+        makeMove(move, "ai-player")
       }
-      makeMove({ colors: guess }, "ai-player")
     }
 
     const handleAiGoFish = () => {
@@ -819,29 +843,7 @@ function getAiGomokuMove(
   return topCandidates[Math.floor(Math.random() * topCandidates.length)]
 }
 
-// ==================== SECRET CODE MOVE ====================
-function applySecretCodeMove(state: GameState, move: { colors: string[] }): GameState {
-  if (!state.secretCode || state.secretCode.gameOver) return state
 
-  if (move.colors.length !== state.secretCode.secretCode.length) return state
-
-  const feedback = evaluateGuess(move.colors, state.secretCode.secretCode)
-  const newGuesses = [...state.secretCode.guesses, { colors: move.colors, feedback }]
-
-  const won = feedback.correct === state.secretCode.secretCode.length
-  const gameOver = won || newGuesses.length >= state.secretCode.maxGuesses
-
-  return {
-    ...state,
-    winner: won ? state.players[1].id : gameOver ? state.players[0].id : null,
-    secretCode: {
-      ...state.secretCode,
-      guesses: newGuesses,
-      gameOver,
-      won,
-    },
-  }
-}
 
 // ==================== GO FISH MOVE ====================
 function applyGoFishMove(state: GameState, move: { rank: string }, playerId: string): GameState {

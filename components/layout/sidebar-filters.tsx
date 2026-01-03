@@ -18,9 +18,9 @@ const FILTERS = [
 
 export function SidebarFilters({ selectedFilter, onFilterChange }: SidebarFiltersProps) {
   return (
-    <aside className="w-56 border-r border-border bg-sidebar p-4 hidden lg:block">
-      <h2 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Categories</h2>
-      <nav className="space-y-1">
+    <aside className="w-full lg:w-56 border-b lg:border-b-0 lg:border-r border-border bg-sidebar p-4 block">
+      <h2 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider hidden lg:block">Categories</h2>
+      <nav className="flex lg:flex-col overflow-x-auto lg:overflow-visible gap-2 lg:gap-1 pb-2 lg:pb-0 scrollbar-hide">
         {FILTERS.map((filter) => {
           const Icon = filter.icon
           return (
@@ -28,7 +28,7 @@ export function SidebarFilters({ selectedFilter, onFilterChange }: SidebarFilter
               key={filter.id}
               onClick={() => onFilterChange(filter.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                "flex-none lg:w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap",
                 selectedFilter === filter.id
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50",

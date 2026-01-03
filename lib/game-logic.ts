@@ -552,13 +552,14 @@ export function checkGomokuWin(board: CellValue[][], lastMove?: { x: number; y: 
 
 // ==================== SECRET CODE ====================
 export interface SecretCodeState {
-  secretCode: string[]
-  guesses: { colors: string[]; feedback: { correct: number; misplaced: number } }[]
+  player1Secret: string[] | null
+  player2Secret: string[] | null
+  guesses: { playerId: string; colors: string[]; feedback: { correct: number; misplaced: number } }[]
   maxGuesses: number
-  isCodeMaker: boolean
-  gameOver: boolean
-  won: boolean
-  codeType: 'colors' | 'numbers' | 'letters'
+  currentPlayer: string
+  phase: "setup" | "playing" | "finished"
+  winner: string | null
+  codeType: "colors" | "numbers" | "letters"
 }
 
 export const SECRET_CODE_COLORS = ["red", "blue", "green", "yellow", "purple", "orange"]
@@ -567,11 +568,14 @@ export const SECRET_CODE_LETTERS = ["A", "B", "C", "D", "E", "F"]
 export const SECRET_CODE_LENGTH = 4
 export const SECRET_CODE_MAX_GUESSES = 10
 
-export function generateSecretCode(length = SECRET_CODE_LENGTH, type: 'colors' | 'numbers' | 'letters' = 'colors'): string[] {
+export function generateSecretCode(
+  length = SECRET_CODE_LENGTH,
+  type: "colors" | "numbers" | "letters" = "colors",
+): string[] {
   let pool = SECRET_CODE_COLORS
-  if (type === 'numbers') pool = SECRET_CODE_NUMBERS
-  if (type === 'letters') pool = SECRET_CODE_LETTERS
-  
+  if (type === "numbers") pool = SECRET_CODE_NUMBERS
+  if (type === "letters") pool = SECRET_CODE_LETTERS
+
   return Array.from({ length }, () => pool[Math.floor(Math.random() * pool.length)])
 }
 
@@ -602,16 +606,102 @@ export function evaluateGuess(guess: string[], secretCode: string[]): { correct:
   return { correct, misplaced }
 }
 
-export function initSecretCode(type: 'colors' | 'numbers' | 'letters' = 'colors'): SecretCodeState {
+export function initSecretCode(type: "colors" | "numbers" | "letters" = "colors"): SecretCodeState {
   return {
-    secretCode: generateSecretCode(SECRET_CODE_LENGTH, type),
+    player1Secret: null,
+    player2Secret: null,
     guesses: [],
     maxGuesses: SECRET_CODE_MAX_GUESSES,
-    isCodeMaker: false,
-    gameOver: false,
-    won: false,
-    codeType: type
+    currentPlayer: "player1",
+    phase: "setup",
+    winner: null,
+    codeType: type,
   }
+}
+
+export function applySecretCodeMove(
+  state: SecretCodeState,
+  move: { action: "setSecret" | "guess"; code: string[] },
+  playerId: string,
+  isPlayer1: boolean,
+): SecretCodeState {
+  if (state.phase === "setup") {
+    if (move.action !== "setSecret") return state
+
+    const newState = { ...state }
+    if (isPlayer1) newState.player1Secret = move.code
+    else newState.player2Secret = move.code
+
+    if (newState.player1Secret && newState.player2Secret) {
+      newState.phase = "playing"
+      newState.currentPlayer = "player1"
+    }
+
+    return newState
+  }
+
+  if (state.phase === "playing") {
+    if (move.action !== "guess") return state
+    if ((isPlayer1 && state.currentPlayer !== "player1") || (!isPlayer1 && state.currentPlayer !== "player2")) {
+      return state
+    }
+
+    const secretToGuess = isPlayer1 ? state.player2Secret! : state.player1Secret!
+    const feedback = evaluateGuess(move.code, secretToGuess)
+    const newGuesses = [...state.guesses, { playerId, colors: move.code, feedback }]
+
+    if (feedback.correct === SECRET_CODE_LENGTH) {
+      return {
+        ...state,
+        guesses: newGuesses,
+        phase: "finished",
+        winner: playerId,
+      }
+    }
+
+    // Check if player exhausted guesses (tracking individual guess counts could be complex, 
+    // but for now let's say total game length or per player. 
+    // Implementation Plan: Single array, but each player effectively has their own board.
+    // If we want turn-based guessing on separate boards, we just switch turns.
+    
+    return {
+      ...state,
+      guesses: newGuesses,
+      currentPlayer: isPlayer1 ? "player2" : "player1",
+    }
+  }
+
+  return state
+}
+
+export function aiSecretCodeTurn(
+  state: SecretCodeState,
+  aiIsPlayer1: boolean,
+): { action: "setSecret" | "guess"; code: string[] } | null {
+  // 1. Setup Phase
+  if (state.phase === "setup") {
+    const aiSecret = aiIsPlayer1 ? state.player1Secret : state.player2Secret
+    if (!aiSecret) {
+      return {
+        action: "setSecret",
+        code: generateSecretCode(SECRET_CODE_LENGTH, state.codeType),
+      }
+    }
+  }
+
+  // 2. Playing Phase
+  if (state.phase === "playing") {
+    const aiPlayerTag = aiIsPlayer1 ? "player1" : "player2"
+    if (state.currentPlayer === aiPlayerTag) {
+      // Simple random guess for now
+      return {
+        action: "guess",
+        code: generateSecretCode(SECRET_CODE_LENGTH, state.codeType),
+      }
+    }
+  }
+
+  return null
 }
 
 // ==================== GO FISH ====================

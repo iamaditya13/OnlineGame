@@ -14,7 +14,7 @@ interface ProfileDialogProps {
   onLogout: () => void
 }
 
-export function ProfileDialog({ open, onOpenChange, user }: Omit<ProfileDialogProps, "onLogout">) {
+export function ProfileDialog({ open, onOpenChange, user, onLogout }: ProfileDialogProps) {
   if (!user) return null
 
   const totalGames = user.wins + user.losses
@@ -54,7 +54,16 @@ export function ProfileDialog({ open, onOpenChange, user }: Omit<ProfileDialogPr
               <p className="text-center text-muted-foreground py-8">Match history is not available in guest mode.</p>
           </ScrollArea>
         </div>
-    </DialogContent>
+        <DialogFooter>
+          <Button variant="destructive" onClick={() => {
+            onLogout()
+            onOpenChange(false) 
+          }} className="w-full sm:w-auto">
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   )
 }
