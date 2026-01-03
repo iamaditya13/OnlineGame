@@ -10,7 +10,7 @@ import { BattleshipBoard } from "./battleship-board"
 import { WarBoard } from "./war-board"
 import { RummyBoard } from "./rummy-board"
 import { ChessBoard } from "./chess-board"
-import type { GameState } from "@/hooks/use-socket"
+import type { GameState } from "@/lib/game-logic"
 
 interface MatchCanvasProps {
   gameType: string
