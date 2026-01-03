@@ -32,110 +32,294 @@ import {
   type WarState,
   type RummyState,
   type ChessState,
+  type GameState,
+  createInitialGameState,
 } from "@/lib/game-logic"
 
-export interface GameState {
-  board: (string | null)[][]
-  currentPlayer: string
-  players: { id: string; username: string; symbol?: string }[]
-  winner: string | null
-  isDraw: boolean
-  moveHistory: { playerId: string; move: unknown; timestamp: number }[]
-  winningCells?: { x: number; y: number }[]
-  lastMove?: { x: number; y: number }
-  difficulty: 'easy' | 'medium' | 'hard'
-  secretCode?: SecretCodeState
-  goFish?: GoFishState
-  battleship?: BattleshipState
-  war?: WarState
-  rummy?: RummyState
-  chess?: ChessState
+export interface RoomState {
+  code: string
+  hostId: string
+  gameType: string
+  status: "waiting" | "playing" | "finished"
+  players: { id: string; username: string; isReady: boolean; isHost?: boolean }[]
+  chat: { userId: string; username: string; message: string; timestamp: number }[]
+  settings: {
+    mode: string
+    isPublic: boolean
+  }
+  isAiGame?: boolean
+  gameState?: GameState | null
 }
 
+export function useSocket(userId: string | undefined) {
+  const [isConnected, setIsConnected] = useState(false)
+  const [roomState, setRoomState] = useState<RoomState | null>(null)
 
-function createInitialGameState(gameType: string, player1Id: string, player2Id: string = "player2", difficulty: 'easy' | 'medium' | 'hard' = 'medium'): GameState {
-  const baseState: GameState = {
-    board: [],
-    currentPlayer: player1Id,
-    players: [
-      { id: player1Id, username: "Player 1", symbol: "X" },
-      { id: player2Id, username: player2Id === "ai-player" ? "AI Opponent" : "Player 2", symbol: "O" },
-    ],
-    winner: null,
-    isDraw: false,
-    moveHistory: [],
-    difficulty
-  }
+  // Polling for Room State Updates
+  useEffect(() => {
+    if (!roomState?.code) return
 
-  switch (gameType) {
-    case "tic-tac-toe":
-      return {
-        ...baseState,
-        board: Array(3)
-          .fill(null)
-          .map(() => Array(3).fill(null)),
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/match/${roomState.code}`)
+        if (res.ok) {
+          const data = await res.json()
+          setRoomState(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(data)) {
+               return data
+            }
+            return prev
+          })
+        }
+      } catch (err) {
+        console.error("Polling error:", err)
       }
-    case "connect-4":
+    }
+
+    const interval = setInterval(poll, 1000)
+    return () => clearInterval(interval)
+  }, [roomState?.code])
+
+  // Connection Simulation
+  useEffect(() => {
+    if (!userId) return
+    const timer = setTimeout(() => setIsConnected(true), 500)
+    return () => clearTimeout(timer)
+  }, [userId])
+
+  const createRoom = useCallback(
+    async (gameType: string, mode: string, isAiGame: boolean = false, difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
+      try {
+        const res = await fetch("/api/match/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gameType,
+            mode,
+            isAiGame,
+            difficulty,
+            userId
+          })
+        })
+        const data = await res.json()
+        if (data.roomState) {
+          setRoomState(data.roomState)
+          return data.code
+        }
+      } catch (e) { console.error("Create room failed", e) }
+      return null
+    },
+    [userId]
+  )
+
+  const joinRoom = useCallback(
+    async (code: string, gameType?: string) => {
+      if (!userId) return false
+      try {
+        if (roomState?.code === code) return true
+
+        const res = await fetch(`/api/match/${code}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "join",
+            userId,
+            payload: { username: "Guest" } // We could prompt name later
+          })
+        })
+        
+        if (res.ok) {
+           const data = await res.json()
+           setRoomState(data)
+           return true
+        }
+      } catch (e) { console.error("Join room failed", e) }
+      return false
+    },
+    [roomState, userId],
+  )
+
+  const makeMove = useCallback(
+    async (move: unknown, asPlayerId?: string) => {
+      if (!roomState?.gameState || (!userId && !asPlayerId)) return
+
+      const playerId = asPlayerId || userId || "unknown"
+      const newGameState = applyMove(roomState.gameState, move, playerId, roomState.gameType)
+      
+      setRoomState((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          gameState: newGameState,
+        }
+      })
+
+      try {
+        await fetch(`/api/match/${roomState.code}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+             action: "move",
+             userId: playerId, 
+             payload: { gameState: newGameState } 
+          })
+        })
+      } catch(e) { console.error("Move failed", e) }
+    },
+    [roomState, userId],
+  )
+
+  const sendChat = useCallback(async (message: string) => {
+    if (!roomState || !userId) return
+
+    const newMessage = {
+      userId,
+      username: roomState.players.find(p => p.id === userId)?.username || "Unknown",
+      message,
+      timestamp: Date.now(),
+    }
+
+    setRoomState((prev) => {
+      if (!prev) return null
       return {
-        ...baseState,
-        board: Array(6)
-          .fill(null)
-          .map(() => Array(7).fill(null)),
+        ...prev,
+        chat: [...prev.chat, newMessage],
       }
-    case "chess":
-      return {
-        ...baseState,
-        chess: initChess(difficulty),
+    })
+
+    try {
+        await fetch(`/api/match/${roomState.code}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+             action: "chat",
+             userId,
+             payload: newMessage
+          })
+        })
+      } catch(e) { console.error("Chat failed", e) }
+  }, [roomState, userId])
+
+  const leaveRoom = useCallback(() => {
+    setRoomState(null)
+  }, [])
+
+  const { recordMatch } = useLocalUser()
+
+  useEffect(() => {
+    if (roomState?.gameState?.winner && !roomState.gameState.isDraw) {
+      const isWinner = roomState.gameState.winner === userId
+      const result = isWinner ? "win" : "loss"
+      recordMatch(roomState.gameType, result)
+    } else if (roomState?.gameState?.isDraw) {
+      recordMatch(roomState.gameType, "draw")
+    }
+  }, [roomState?.gameState?.winner, roomState?.gameState?.isDraw])
+
+  const isHost = roomState?.players[0]?.id === userId
+  
+  useEffect(() => {
+    if (!isHost && !roomState?.isAiGame) return 
+    
+    if (!roomState?.isAiGame || !roomState.gameState) return
+
+    if (roomState.gameType.startsWith("secret-code") && roomState.gameState.secretCode) {
+      const sc = roomState.gameState.secretCode
+      const isAiTurn = (sc.phase === "setup" && !sc.player2Secret) || 
+                       (sc.phase === "playing" && sc.currentPlayer === "player2")
+      
+      if (isAiTurn) {
+        const timer = setTimeout(() => {
+             window.dispatchEvent(new CustomEvent("ai-secret-code-turn"))
+        }, 1000)
+        return () => clearTimeout(timer)
       }
-    case "gomoku":
-      return {
-        ...baseState,
-        board: Array(15)
-          .fill(null)
-          .map(() => Array(15).fill(null)),
+    }
+  }, [roomState, isHost])
+
+  useEffect(() => {
+    if (!isHost && roomState?.isAiGame) return 
+    
+    const handleAiMove = (e: Event) => {
+      const customEvent = e as CustomEvent
+      makeMove(customEvent.detail, "ai-player")
+    }
+
+    const handleAiBattleship = () => {
+      if (!roomState?.gameState?.battleship) return
+      const size = 10
+      let x, y
+      for(let i=0; i<20; i++) {
+        x = Math.floor(Math.random() * size)
+        y = Math.floor(Math.random() * size)
+        const cell = roomState.gameState.battleship.playerBoard[x][y]
+        if (cell === null || cell === "ship") break
       }
-    case "secret-code":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('colors'),
+      if (x !== undefined && y !== undefined) {
+        makeMove({ x, y }, "ai-player")
       }
-    case "secret-code-numbers":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('numbers'),
+    }
+
+    const handleAiRummy = () => {
+       makeMove({ action: "draw", from: "deck" }, "ai-player")
+       setTimeout(() => {
+       }, 500)
+    }
+
+    const handleAiSecretCode = () => {
+      if (!roomState?.gameState?.secretCode) return
+      const move = aiSecretCodeTurn(roomState.gameState.secretCode, false)
+      if (move) {
+        makeMove(move, "ai-player")
       }
-    case "secret-code-letters":
-      return {
-        ...baseState,
-        secretCode: initSecretCode('letters'),
+    }
+
+    const handleAiGoFish = () => {
+      const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+      const rank = ranks[Math.floor(Math.random() * ranks.length)]
+      makeMove({ rank }, "ai-player")
+    }
+
+    const handleAiWar = () => {
+      makeMove({ action: "play" }, "ai-player")
+    }
+
+    const handleAiChess = () => {
+      if (!roomState?.gameState?.chess) return
+      const move = aiChessTurn(roomState.gameState.chess)
+      if (move) {
+        makeMove(move, "ai-player")
       }
-    case "go-fish":
-      return {
-        ...baseState,
-        goFish: initGoFish(),
-      }
-    case "battleship":
-      return {
-        ...baseState,
-        battleship: initBattleship(),
-      }
-    case "war":
-      return {
-        ...baseState,
-        war: initWar(),
-      }
-    case "rummy":
-      return {
-        ...baseState,
-        rummy: initRummy(),
-      }
-    default:
-      return {
-        ...baseState,
-        board: Array(3)
-          .fill(null)
-          .map(() => Array(3).fill(null)),
-      }
+    }
+
+    window.addEventListener("ai-move", handleAiMove)
+    window.addEventListener("ai-battleship-turn", handleAiBattleship)
+    window.addEventListener("ai-rummy-turn", handleAiRummy)
+    window.addEventListener("ai-secret-code-turn", handleAiSecretCode)
+    window.addEventListener("ai-go-fish-turn", handleAiGoFish)
+    window.addEventListener("ai-war-turn", handleAiWar)
+    window.addEventListener("ai-chess-turn", handleAiChess)
+    
+    return () => {
+      window.removeEventListener("ai-move", handleAiMove)
+      window.removeEventListener("ai-battleship-turn", handleAiBattleship)
+      window.removeEventListener("ai-rummy-turn", handleAiRummy)
+      window.removeEventListener("ai-secret-code-turn", handleAiSecretCode)
+      window.removeEventListener("ai-go-fish-turn", handleAiGoFish)
+      window.removeEventListener("ai-war-turn", handleAiWar)
+      window.removeEventListener("ai-chess-turn", handleAiChess)
+    }
+  }, [makeMove, roomState, isHost])
+
+  return {
+    isConnected,
+    roomState,
+    createRoom,
+    joinRoom,
+    makeMove,
+    sendChat,
+    leaveRoom,
+    setRoomState,
   }
 }
 
@@ -149,7 +333,6 @@ function applyMove(state: GameState, move: unknown, playerId: string, gameType: 
       const chessState = applyChessMove(state.chess!, move as { from: { x: number; y: number }, to: { x: number; y: number } })
       const winner = chessState.winner === "player1" ? state.players[0].id : chessState.winner === "player2" ? state.players[1].id : null
       
-      // AI Turn
       if (chessState.turn === 'b' && !chessState.gameOver) {
          setTimeout(() => {
             window.dispatchEvent(new CustomEvent("ai-chess-turn"))
@@ -193,288 +376,6 @@ function applyMove(state: GameState, move: unknown, playerId: string, gameType: 
       return state
   }
 }
-
-export interface RoomState {
-  code: string
-  hostId: string
-  gameType: string
-  status: "waiting" | "playing" | "finished"
-  players: { id: string; username: string; isReady: boolean; isHost?: boolean }[]
-  chat: { userId: string; username: string; message: string; timestamp: number }[]
-  settings: {
-    mode: string
-    isPublic: boolean
-  }
-  isAiGame?: boolean
-  gameState?: GameState | null
-}
-
-export function useSocket(userId: string | undefined) {
-  const [isConnected, setIsConnected] = useState(false)
-  const [roomState, setRoomState] = useState<RoomState | null>(null)
-
-  // Load room state from local storage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("timekill_room")
-    if (stored) {
-      try {
-        setRoomState(JSON.parse(stored))
-      } catch (e) {
-        console.error("Failed to parse stored room state", e)
-      }
-    }
-  }, [])
-
-  // Save room state to local storage whenever it changes
-  useEffect(() => {
-    if (roomState) {
-      localStorage.setItem("timekill_room", JSON.stringify(roomState))
-    } else {
-      // Only remove if explicitly set to null (leaving room), not initial load
-      // But we can't distinguish initial null from explicit null here easily without another ref
-      // For now, let's rely on leaveRoom to clear it
-    }
-  }, [roomState])
-
-  useEffect(() => {
-    if (!userId) return
-    const timer = setTimeout(() => setIsConnected(true), 500)
-    return () => clearTimeout(timer)
-  }, [userId])
-
-  const createRoom = useCallback(
-    (gameType: string, mode: string, isAiGame: boolean = false, difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
-      const code = generateRoomCode()
-      const newRoomState: RoomState = {
-        code,
-        hostId: userId || "host",
-        players: [
-          {
-            id: userId || "host",
-            username: "You",
-            isHost: true,
-            isReady: true,
-          },
-        ],
-        gameType,
-        status: "waiting",
-        settings: {
-          mode,
-          isPublic: true,
-        },
-        isAiGame,
-        chat: [],
-        gameState: null,
-      }
-
-      // If AI game, add AI player immediately and start game
-      if (isAiGame) {
-        newRoomState.players.push({
-          id: "ai-player",
-          username: "AI Opponent",
-          isHost: false,
-          isReady: true,
-        })
-        newRoomState.status = "playing"
-        newRoomState.gameState = createInitialGameState(gameType, userId || "host", "ai-player", difficulty)
-      }
-
-      setRoomState(newRoomState)
-      localStorage.setItem("timekill_room", JSON.stringify(newRoomState))
-      return code
-    },
-    [userId],
-  )
-
-  const joinRoom = useCallback(
-    (code: string) => {
-      // In a real app, this would fetch room data from server
-      // For now, we only support joining if we're already in the room (local state)
-      if (roomState?.code === code) {
-        return true
-      }
-      return false
-    },
-    [roomState],
-  )
-
-  const makeMove = useCallback(
-    (move: unknown, asPlayerId?: string) => {
-      if (!roomState?.gameState || !userId) return
-
-      const playerId = asPlayerId || userId
-      const newGameState = applyMove(roomState.gameState, move, playerId, roomState.gameType)
-      
-      setRoomState((prev) => {
-        if (!prev) return null
-        return {
-          ...prev,
-          gameState: newGameState,
-        }
-      })
-    },
-    [roomState, userId],
-  )
-
-  const sendChat = useCallback((message: string) => {
-    if (!roomState || !userId) return
-
-    const newMessage = {
-      userId,
-      username: roomState.players.find(p => p.id === userId)?.username || "Unknown",
-      message,
-      timestamp: Date.now(),
-    }
-
-    setRoomState((prev) => {
-      if (!prev) return null
-      const updated = {
-        ...prev,
-        chat: [...prev.chat, newMessage],
-      }
-      localStorage.setItem("timekill_room", JSON.stringify(updated))
-      return updated
-    })
-  }, [roomState, userId])
-
-  const leaveRoom = useCallback(() => {
-    setRoomState(null)
-    localStorage.removeItem("timekill_room")
-  }, [])
-
-  const { recordMatch } = useLocalUser()
-
-  useEffect(() => {
-    if (roomState?.gameState?.winner && !roomState.gameState.isDraw) {
-      const isWinner = roomState.gameState.winner === userId
-      const result = isWinner ? "win" : "loss"
-      recordMatch(roomState.gameType, result)
-    } else if (roomState?.gameState?.isDraw) {
-      recordMatch(roomState.gameType, "draw")
-    }
-  }, [roomState?.gameState?.winner, roomState?.gameState?.isDraw])
-
-  // AI Watcher
-  useEffect(() => {
-    if (!roomState?.isAiGame || !roomState.gameState) return
-
-    if (roomState.gameType.startsWith("secret-code") && roomState.gameState.secretCode) {
-      const sc = roomState.gameState.secretCode
-      const isAiTurn = (sc.phase === "setup" && !sc.player2Secret) || 
-                       (sc.phase === "playing" && sc.currentPlayer === "player2")
-      
-      if (isAiTurn) {
-        const timer = setTimeout(() => {
-             window.dispatchEvent(new CustomEvent("ai-secret-code-turn"))
-        }, 1000)
-        return () => clearTimeout(timer)
-      }
-    }
-  }, [roomState])
-
-  useEffect(() => {
-    const handleAiMove = (e: Event) => {
-      const customEvent = e as CustomEvent
-      makeMove(customEvent.detail, "ai-player")
-    }
-
-    const handleAiBattleship = () => {
-      if (!roomState?.gameState?.battleship) return
-      // Simple random AI for battleship
-      const size = 10
-      let x, y
-      // Try 20 times to find a valid move
-      for(let i=0; i<20; i++) {
-        x = Math.floor(Math.random() * size)
-        y = Math.floor(Math.random() * size)
-        // Check if already attacked (simplified check)
-        const cell = roomState.gameState.battleship.playerBoard[x][y]
-        if (cell === null || cell === "ship") break
-      }
-      if (x !== undefined && y !== undefined) {
-        makeMove({ x, y }, "ai-player")
-      }
-    }
-
-    const handleAiRummy = () => {
-       // Simple AI for Rummy: Draw then Discard
-       makeMove({ action: "draw", from: "deck" }, "ai-player")
-       setTimeout(() => {
-         // Discard a random card (simplified)
-         // In a real app we would check hand and discard logic
-         // For now we just skip the discard to avoid errors
-       }, 500)
-    }
-
-    const handleAiSecretCode = () => {
-      if (!roomState?.gameState?.secretCode) return
-      
-      const move = aiSecretCodeTurn(roomState.gameState.secretCode, false)
-      if (move) {
-        makeMove(move, "ai-player")
-      }
-    }
-
-    const handleAiGoFish = () => {
-      // Simple AI: ask for random rank
-      const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
-      const rank = ranks[Math.floor(Math.random() * ranks.length)]
-      makeMove({ rank }, "ai-player")
-    }
-
-    const handleAiWar = () => {
-      // War is auto-play usually, but if manual:
-      makeMove({ action: "play" }, "ai-player")
-    }
-
-    const handleAiChess = () => {
-      if (!roomState?.gameState?.chess) return
-      const move = aiChessTurn(roomState.gameState.chess)
-      if (move) {
-        makeMove(move, "ai-player")
-      }
-    }
-
-    window.addEventListener("ai-move", handleAiMove)
-    window.addEventListener("ai-battleship-turn", handleAiBattleship)
-    window.addEventListener("ai-rummy-turn", handleAiRummy)
-    window.addEventListener("ai-secret-code-turn", handleAiSecretCode)
-    window.addEventListener("ai-go-fish-turn", handleAiGoFish)
-    window.addEventListener("ai-war-turn", handleAiWar)
-    window.addEventListener("ai-chess-turn", handleAiChess)
-    
-    return () => {
-      window.removeEventListener("ai-move", handleAiMove)
-      window.removeEventListener("ai-battleship-turn", handleAiBattleship)
-      window.removeEventListener("ai-rummy-turn", handleAiRummy)
-      window.removeEventListener("ai-secret-code-turn", handleAiSecretCode)
-      window.removeEventListener("ai-go-fish-turn", handleAiGoFish)
-      window.removeEventListener("ai-war-turn", handleAiWar)
-      window.removeEventListener("ai-chess-turn", handleAiChess)
-    }
-  }, [makeMove, roomState])
-
-  return {
-    isConnected,
-    roomState,
-    createRoom,
-    joinRoom,
-    makeMove,
-    sendChat,
-    leaveRoom,
-    setRoomState,
-  }
-}
-
-function generateRoomCode(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let code = ""
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return code
-}
-
 
 // ==================== TIC-TAC-TOE MOVE ====================
 function applyTicTacToeMove(state: GameState, move: { x: number; y: number }, playerId: string): GameState {
@@ -525,21 +426,15 @@ function getAiTicTacToeMove(board: (string | null)[][], difficulty: 'easy' | 'me
 
   if (emptyCells.length === 0) return null
 
-  // Easy: Random move
   if (difficulty === 'easy') {
     return emptyCells[Math.floor(Math.random() * emptyCells.length)]
   }
 
-  // Medium: Win if can, Block if must, else Random
-  // Hard: Minimax (Unbeatable)
-
-  // Check for winning move (AI is 'O')
   for (const cell of emptyCells) {
     const testBoard = board.map((r, i) => r.map((c, j) => (i === cell.x && j === cell.y ? "O" : c)))
     if (checkTicTacToeWin(testBoard).winner === "O") return cell
   }
 
-  // Check for blocking move (Player is 'X')
   for (const cell of emptyCells) {
     const testBoard = board.map((r, i) => r.map((c, j) => (i === cell.x && j === cell.y ? "X" : c)))
     if (checkTicTacToeWin(testBoard).winner === "X") return cell
@@ -550,7 +445,6 @@ function getAiTicTacToeMove(board: (string | null)[][], difficulty: 'easy' | 'me
      return emptyCells[Math.floor(Math.random() * emptyCells.length)]
   }
 
-  // Hard: Minimax
   let bestScore = -Infinity
   let bestMove = null
 
@@ -648,30 +542,26 @@ function getAiConnectMove(board: (string | null)[][], n: number, difficulty: 'ea
 
   if (validColumns.length === 0) return null
 
-  // Easy: Random
   if (difficulty === 'easy') {
     return validColumns[Math.floor(Math.random() * validColumns.length)]
   }
 
-  // Medium/Hard: Check for immediate wins/blocks
   for (const col of validColumns) {
-    const result = dropPiece(board, col, "O") // AI
+    const result = dropPiece(board, col, "O") 
     if (result && checkConnectNWin(result.newBoard, n).winner === "O") return col
   }
 
   for (const col of validColumns) {
-    const result = dropPiece(board, col, "X") // Player
+    const result = dropPiece(board, col, "X") 
     if (result && checkConnectNWin(result.newBoard, n).winner === "X") return col
   }
 
-  // Medium: Center bias + Random
   if (difficulty === 'medium') {
     const centerCol = Math.floor(cols / 2)
     if (validColumns.includes(centerCol) && Math.random() > 0.3) return centerCol
     return validColumns[Math.floor(Math.random() * validColumns.length)]
   }
 
-  // Hard: Minimax with depth limit
   let bestScore = -Infinity
   let bestCol = validColumns[0]
 
@@ -693,7 +583,7 @@ function minimaxConnect(board: (string | null)[][], depth: number, isMaximizing:
   if (result.winner === "O") return 1000 - currentDepth
   if (result.winner === "X") return currentDepth - 1000
   if (result.isDraw) return 0
-  if (currentDepth >= 4) return 0 // Depth limit
+  if (currentDepth >= 4) return 0 
 
   const cols = board[0].length
   const validColumns: number[] = []
@@ -771,7 +661,6 @@ function getAiGomokuMove(
 ): { x: number; y: number } | null {
   const size = board.length
   
-  // Easy: Random near center or random valid
   if (difficulty === 'easy') {
      const candidates: { x: number; y: number }[] = []
      for(let i=0; i<size; i++) {
@@ -792,7 +681,6 @@ function getAiGomokuMove(
       let hasNeighbor = false
       let score = 0
 
-      // Check neighborhood
       for (let di = -2; di <= 2; di++) {
         for (let dj = -2; dj <= 2; dj++) {
           const ni = i + di
@@ -806,19 +694,15 @@ function getAiGomokuMove(
       }
       
       if (difficulty === 'hard') {
-         // Defensive check: if opponent has 3 or 4 in a row, block it!
-         // This is a simplified check. A real Gomoku AI needs full evaluation.
-         // Let's simulate placing 'X' (opponent) here and see if they win or get close
          const testBoardX = board.map(r => [...r])
          testBoardX[i][j] = "X"
          const winX = checkGomokuWin(testBoardX, {x: i, y: j})
-         if (winX.winner === "X") score += 1000 // Must block win
+         if (winX.winner === "X") score += 1000 
 
-         // Offensive check: if we can win
          const testBoardO = board.map(r => [...r])
          testBoardO[i][j] = "O"
          const winO = checkGomokuWin(testBoardO, {x: i, y: j})
-         if (winO.winner === "O") score += 2000 // Win immediately
+         if (winO.winner === "O") score += 2000 
       }
 
       if (hasNeighbor) candidates.push({ x: i, y: j, score })
@@ -875,7 +759,6 @@ function applyBattleshipMove(
 
   const { x, y, horizontal, rotate } = move
 
-  // Handle rotation toggle
   if (rotate) {
     return {
       ...state,
@@ -887,7 +770,6 @@ function applyBattleshipMove(
     }
   }
 
-  // Placement phase
   if (state.battleship.phase === "placement") {
     const shipDef = BATTLESHIP_SHIPS[state.battleship.placingShip]
     const isHorizontal = horizontal !== undefined ? horizontal : state.battleship.placementHorizontal
@@ -920,12 +802,10 @@ function applyBattleshipMove(
     }
   }
 
-  // Attack phase
   if (state.battleship.currentTurn !== "player") return state
 
   const newBattleshipState = attackCell(state.battleship, x, y, "player")
 
-  // AI turn if player missed and game not over
   if (newBattleshipState.currentTurn === "opponent" && !newBattleshipState.gameOver) {
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent("ai-battleship-turn"))
@@ -977,7 +857,6 @@ function applyRummyMove(
     case "discard":
       if (move.cardId) {
         newRummyState = discardCard(state.rummy, move.cardId)
-        // AI turn after player discards
         if (newRummyState.currentTurn === "opponent" && newRummyState.phase === "playing") {
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent("ai-rummy-turn"))

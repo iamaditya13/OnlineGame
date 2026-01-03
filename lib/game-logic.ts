@@ -1645,3 +1645,109 @@ export function aiRummyTurn(state: RummyState): RummyState {
     lastAction: `Opponent discarded ${discardedCard.display}${discardedCard.suit}. Your turn - draw a card.`,
   }
 }
+
+// ==================== GLOBAL GAME STATE ====================
+
+export interface GameState {
+  board: (string | null)[][]
+  currentPlayer: string
+  players: { id: string; username: string; symbol?: string }[]
+  winner: string | null
+  isDraw: boolean
+  moveHistory: { playerId: string; move: unknown; timestamp: number }[]
+  winningCells?: { x: number; y: number }[]
+  lastMove?: { x: number; y: number }
+  difficulty: 'easy' | 'medium' | 'hard'
+  secretCode?: SecretCodeState
+  goFish?: GoFishState
+  battleship?: BattleshipState
+  war?: WarState
+  rummy?: RummyState
+  chess?: ChessState
+}
+
+export function createInitialGameState(gameType: string, player1Id: string, player2Id: string = "player2", difficulty: 'easy' | 'medium' | 'hard' = 'medium'): GameState {
+  const baseState: GameState = {
+    board: [],
+    currentPlayer: player1Id,
+    players: [
+      { id: player1Id, username: "Player 1", symbol: "X" },
+      { id: player2Id, username: player2Id === "ai-player" ? "AI Opponent" : "Player 2", symbol: "O" },
+    ],
+    winner: null,
+    isDraw: false,
+    moveHistory: [],
+    difficulty
+  }
+
+  switch (gameType) {
+    case "tic-tac-toe":
+      return {
+        ...baseState,
+        board: Array(3)
+          .fill(null)
+          .map(() => Array(3).fill(null)),
+      }
+    case "connect-4":
+      return {
+        ...baseState,
+        board: Array(6)
+          .fill(null)
+          .map(() => Array(7).fill(null)),
+      }
+    case "chess":
+      return {
+        ...baseState,
+        chess: initChess(difficulty),
+      }
+    case "gomoku":
+      return {
+        ...baseState,
+        board: Array(15)
+          .fill(null)
+          .map(() => Array(15).fill(null)),
+      }
+    case "secret-code":
+      return {
+        ...baseState,
+        secretCode: initSecretCode('colors'),
+      }
+    case "secret-code-numbers":
+      return {
+        ...baseState,
+        secretCode: initSecretCode('numbers'),
+      }
+    case "secret-code-letters":
+      return {
+        ...baseState,
+        secretCode: initSecretCode('letters'),
+      }
+    case "go-fish":
+      return {
+        ...baseState,
+        goFish: initGoFish(),
+      }
+    case "battleship":
+      return {
+        ...baseState,
+        battleship: initBattleship(),
+      }
+    case "war":
+      return {
+        ...baseState,
+        war: initWar(),
+      }
+    case "rummy":
+      return {
+        ...baseState,
+        rummy: initRummy(),
+      }
+    default:
+      return {
+        ...baseState,
+        board: Array(3)
+          .fill(null)
+          .map(() => Array(3).fill(null)),
+      }
+  }
+}

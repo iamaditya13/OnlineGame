@@ -154,9 +154,11 @@ export default function LobbyPage() {
     setCreateModalOpen(true)
   }
 
-  const handleCreateRoom = (gameType: string, mode: string, isAiGame: boolean, difficulty: 'easy' | 'medium' | 'hard') => {
-    const roomCode = createRoom(gameType, mode, isAiGame, difficulty)
-    router.push(`/room/${roomCode}?game=${gameType}`)
+  const handleCreateRoom = async (gameType: string, mode: string, isAiGame: boolean, difficulty: 'easy' | 'medium' | 'hard') => {
+    const roomCode = await createRoom(gameType, mode, isAiGame, difficulty)
+    if (roomCode) {
+      router.push(`/room/${roomCode}?game=${gameType}`)
+    }
   }
 
   if (isLoading) {

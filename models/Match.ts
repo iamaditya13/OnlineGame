@@ -1,27 +1,16 @@
 import mongoose, { Schema } from 'mongoose';
 
-export interface IMatch {
-  gameType: string;
-  players: { userId: string; result: 'win' | 'loss' | 'draw' }[];
-  durationSeconds: number;
-  winnerId?: string;
-  playedAt: Date;
-}
-
-const MatchSchema = new Schema<IMatch>(
+// Flexible Schema to store the entire RoomState JSON object
+const MatchSchema = new Schema(
   {
-    gameType: { type: String, required: true },
-    players: [{
-      userId: { type: String, required: true },
-      result: { type: String, enum: ['win', 'loss', 'draw'], required: true }
-    }],
-    durationSeconds: { type: Number, default: 0 },
-    winnerId: { type: String },
-    playedAt: { type: Date, default: Date.now }
+    code: { type: String, required: true, unique: true, index: true },
+    roomState: { type: Schema.Types.Mixed, required: true }, // Store the full Redux-like state
+    lastUpdated: { type: Date, default: Date.now, expires: 86400 } // Auto-delete after 24 hours
   },
   { timestamps: true }
 );
 
+// Prevent compiling model multiple times in development
 const Match = mongoose.models.Match || mongoose.model('Match', MatchSchema);
 
 export default Match;

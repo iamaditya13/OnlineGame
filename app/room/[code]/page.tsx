@@ -52,9 +52,9 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (user && !roomState) {
-      joinRoom(code)
+      joinRoom(code, gameTypeFromUrl)
     }
-  }, [user, code, roomState, joinRoom])
+  }, [user, code, roomState, joinRoom, gameTypeFromUrl])
 
   useEffect(() => {
     if (roomState?.status === "playing") {
