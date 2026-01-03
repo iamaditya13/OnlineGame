@@ -1,6 +1,6 @@
 "use client"
 
-import { Search, Plus, User } from "lucide-react"
+import { Search, Plus, User, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { TutorialButton } from "@/components/ui/tutorial-button"
@@ -8,11 +8,12 @@ import { TutorialButton } from "@/components/ui/tutorial-button"
 interface HeaderProps {
   username?: string
   onCreateRoom: () => void
+  onJoinRoom: () => void
   searchQuery: string
   onSearchChange: (query: string) => void
 }
 
-export function Header({ username, onCreateRoom, searchQuery, onSearchChange }: HeaderProps) {
+export function Header({ username, onCreateRoom, onJoinRoom, searchQuery, onSearchChange }: HeaderProps) {
   return (
     <header className="h-16 border-b border-border bg-card px-4 flex items-center gap-4">
       <div className="flex items-center gap-2">
@@ -37,6 +38,11 @@ export function Header({ username, onCreateRoom, searchQuery, onSearchChange }: 
       <div className="flex items-center gap-3">
         <TutorialButton onClick={() => document.dispatchEvent(new CustomEvent("open-tutorial"))} />
         
+        <Button onClick={onJoinRoom} variant="outline" className="border-border text-foreground hover:bg-secondary">
+          <LogIn className="h-4 w-4 mr-2" />
+          <span className="hidden sm:inline">Join</span>
+        </Button>
+
         <Button onClick={onCreateRoom} className="bg-primary text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Create Room</span>

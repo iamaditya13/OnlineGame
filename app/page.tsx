@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/header"
 import { SidebarFilters } from "@/components/layout/sidebar-filters"
 import { GameCard } from "@/components/ui/game-card"
 import { CreateRoomModal } from "@/components/ui/create-room-modal"
+import { JoinRoomModal } from "@/components/ui/join-room-modal"
 import { UsernameModal } from "@/components/ui/username-modal"
 import { TutorialOverlay } from "@/components/ui/tutorial-overlay"
 import { ProfileDialog } from "@/components/ui/profile-dialog"
@@ -104,6 +105,7 @@ export default function LobbyPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFilter, setSelectedFilter] = useState("all")
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [joinModalOpen, setJoinModalOpen] = useState(false)
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [selectedGame, setSelectedGame] = useState<string | undefined>()
@@ -178,10 +180,13 @@ export default function LobbyPage() {
         onCreateRoom={handleCreateRoom}
         selectedGame={selectedGame}
       />
+      
+      <JoinRoomModal open={joinModalOpen} onOpenChange={setJoinModalOpen} />
 
       <Header
         username={user?.username}
         onCreateRoom={() => setCreateModalOpen(true)}
+        onJoinRoom={() => setJoinModalOpen(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
